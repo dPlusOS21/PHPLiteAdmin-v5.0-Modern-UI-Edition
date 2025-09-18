@@ -201,6 +201,7 @@ Distributed under the MIT License. See `LICENSE` for details.
 ## 🏆 Credits
 
 **Developer**: Daniele Deplano  
+**Developer**: Roberto Viola
 **Inspired by**: Original PHPLiteAdmin project  
 **Tech Stack**: PHP, SQLite, HTML5, CSS3, JavaScript  
 **AI Assistant**: Assisted by Perplexity AI and DeepSeek
