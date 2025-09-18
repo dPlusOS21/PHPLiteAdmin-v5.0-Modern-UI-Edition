@@ -1517,20 +1517,47 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                             </li>
 
                             <li class="nav-item">
+                                <?php
+                                  // All’inizio della sidebar, subito dopo aver stabilito $pdo:
+                                  // Recupera l’elenco delle tabelle
+                                  $currenttables = $pdo
+                                    ->query(
+                                      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                                    )
+                                    ->fetchAll(PDO::FETCH_COLUMN);
+                                ?>
+
                                 <form method="get" class="sidebar-form">
                                     <input type="hidden" name="db" value="<?= urlencode($dbfile) ?>">
                                     <input type="hidden" name="page" value="dashboard">
-                                    <div class="form-group">
+                                    <input type="hidden" name="db" value="<?=urlencode($dbfile)?>">
+                                    <input type="hidden" name="page" value="<?=htmlspecialchars($page)?>">
+                                     <div class="form-group">
                                         <select name="export_format" class="form-select form-input">
                                             <option value="sql">SQL</option>
                                             <option value="csv">CSV</option>
                                         </select>
                                     </div>
-                                    <button type="submit" class="btn btn-warning btn-full btn-sm">
+                                     <!-- Aggiungere qui: selettore tabella visibile solo se CSV -->
+                                      <div id="csv-table-selector" class="form-group" style="display:none;">
+                                        <label>Tabella per CSV:</label>
+                                        <select name="table" class="form-select form-input">
+                                          <?php foreach($currenttables as $t): ?>
+                                            <option value="<?=htmlspecialchars($t)?>"><?=htmlspecialchars($t)?></option>
+                                          <?php endforeach; ?>
+                                        </select>
+                                      </div>
+                                     <button type="submit" class="btn btn-warning btn-full btn-sm">
                                         <i class="fas fa-download"></i>
                                         Esporta
                                     </button>
                                 </form>
+                                    <script>
+                                      document.querySelector('select[name="export_format"]').addEventListener('change', function(e) {
+                                        document.getElementById('csv-table-selector').style.display =
+                                          e.target.value === 'csv' ? 'block' : 'none';
+                                      });
+                                    </script>
                             </li>
 
                             <li class="nav-item">
@@ -3286,4 +3313,3 @@ document.querySelectorAll('.alert').forEach(function(alert) {
   if(alert.textContent.trim() === '') { alert.style.display = 'none'; }
 });
 </script>
-
