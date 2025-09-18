@@ -217,3 +217,12 @@ For support, bug reports, or feature requests:
 ⭐ **If you find this project useful, give it a star on GitHub!** ⭐
 
 *Last updated: September 2025*
+
+<img width="1920" height="1080" alt="Schermata a 2025-09-18 13-22-38" src="https://github.com/user-attachments/assets/d5373958-84f9-44d1-9983-e6f6bf363a1b" />
+<img width="1920" height="1080" alt="Schermata a 2025-09-18 13-23-15" src="https://github.com/user-attachments/assets/76ce6ec9-431a-4a2a-9ba1-a6799ad850ef" />
+<img width="1920" height="1080" alt="Schermata a 2025-09-18 13-23-50" src="https://github.com/user-attachments/assets/0625fe09-33d8-4cb9-812c-a0e1a92eed53" />
+<img width="1920" height="1080" alt="Schermata a 2025-09-18 13-24-40" src="https://github.com/user-attachments/assets/a4bd205a-34ba-4b77-bf21-580f11413e17" />
+
+
+
+
