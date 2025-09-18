@@ -222,6 +222,9 @@ For support, bug reports, or feature requests:
 <img width="1920" height="1080" alt="Schermata a 2025-09-18 13-23-15" src="https://github.com/user-attachments/assets/76ce6ec9-431a-4a2a-9ba1-a6799ad850ef" />
 <img width="1920" height="1080" alt="Schermata a 2025-09-18 13-23-50" src="https://github.com/user-attachments/assets/0625fe09-33d8-4cb9-812c-a0e1a92eed53" />
 <img width="1920" height="1080" alt="Schermata a 2025-09-18 13-24-40" src="https://github.com/user-attachments/assets/a4bd205a-34ba-4b77-bf21-580f11413e17" />
+<img width="1920" height="1080" alt="Schermata a 2025-09-18 13-28-30" src="https://github.com/user-attachments/assets/67ed7114-0405-4026-8cf8-a7bc27c81321" />
+
+
 
 
 
