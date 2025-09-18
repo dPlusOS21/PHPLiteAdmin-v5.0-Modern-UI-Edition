@@ -3,7 +3,8 @@
  * PHPLiteAdmin v5.0 - Modern UI Edition
  * Gestione database SQLite con interfaccia moderna e responsiva
  * Funzioni complete integrate e costruite con IA Preplexity e DeepSeek derivate come idea dal vecchio e non responsivo programma phpliteadmin.php
- * Autore: Daniele Deplano 
+ * Autore: Daniele Deplano - email: deplano.d@gmail.com
+ * Autore: Roberto Viola - vroby65
  */
 
 // ============ CONFIGURAZIONI COLORI PERSONALIZZABILI ============
@@ -3285,3 +3286,4 @@ document.querySelectorAll('.alert').forEach(function(alert) {
   if(alert.textContent.trim() === '') { alert.style.display = 'none'; }
 });
 </script>
+
