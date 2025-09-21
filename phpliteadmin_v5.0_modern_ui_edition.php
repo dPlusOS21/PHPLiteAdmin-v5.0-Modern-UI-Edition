@@ -1,38 +1,38 @@
 <?php
 /**
  * PHPLiteAdmin v5.0 - Modern UI Edition
- * Gestione database SQLite con interfaccia moderna e responsiva
- * Funzioni complete integrate e costruite con IA Preplexity e DeepSeek derivate come idea dal vecchio e non responsivo programma phpliteadmin.php
- * Autore: Daniele Deplano - email: deplano.d@gmail.com
- * Autore: Roberto Viola - vroby65
+ * SQLite database management with a modern and responsive interface
+ * Integrated and built with AI Preplexity and DeepSeek features derived as an idea from the old and non-responsive program phpliteadmin.php
+ * Autor: Daniele Deplano - email: deplano.d@gmail.com
+ * Autor: Roberto Viola - vroby65
  */
 
-// ============ CONFIGURAZIONI COLORI PERSONALIZZABILI ============
+// ============ CUSTOMIZABLE COLOR CONFIGURATIONS ============
 $APP_NAME = 'PHPLiteAdmin v5.0 - Modern UI Edition';
-$ADMIN_PASS = 'admin123';  // CAMBIA QUESTA PASSWORD!
+$ADMIN_PASS = 'admin123';  // CHANGE THIS PASSWORD!
 
 // Colori del tema (personalizzabili)
 $PRIMARY_COLOR = '#2563eb';         // Blu principale
-$PRIMARY_DARK = '#1d4ed8';          // Blu scuro
-$SECONDARY_COLOR = '#64748b';       // Grigio secondario
-$SUCCESS_COLOR = '#059669';         // Verde successo
-$WARNING_COLOR = '#d97706';         // Arancione warning
-$DANGER_COLOR = '#dc2626';          // Rosso pericolo
-$BACKGROUND_COLOR = '#f8fafc';      // Sfondo principale
-$SIDEBAR_BG = '#1e293b';            // Sfondo sidebar
-$SIDEBAR_TEXT = '#e2e8f0';          // Testo sidebar
+$PRIMARY_DARK = '#1d4ed8';          // Dark blue
+$SECONDARY_COLOR = '#64748b';       // Secondary grey
+$SUCCESS_COLOR = '#059669';         // Green success
+$WARNING_COLOR = '#d97706';         // Orange warning
+$DANGER_COLOR = '#dc2626';          // Danger red
+$BACKGROUND_COLOR = '#f8fafc';      // Main background
+$SIDEBAR_BG = '#1e293b';            // background sidebar
+$SIDEBAR_TEXT = '#e2e8f0';          // Text sidebar
 $SIDEBAR_HOVER = '#334155';         // Hover sidebar
-$SIDEBAR_ACTIVE = '#3b82f6';        // Attivo sidebar
-$CARD_BG = '#ffffff';               // Sfondo card
-$BORDER_COLOR = '#e5e7eb';          // Bordi
+$SIDEBAR_ACTIVE = '#3b82f6';        // Active sidebar
+$CARD_BG = '#ffffff';               // background card
+$BORDER_COLOR = '#e5e7eb';          // Borders
 
-// Configurazioni database
+// Database configurations
 $DATABASES_PATH = './databases/';
 if (!file_exists($DATABASES_PATH)) {
     mkdir($DATABASES_PATH, 0755, true);
 }
 
-// ============ FUNZIONI UTILI ============
+// ============ USEFUL FUNCTIONS ============
 session_start();
 
 function is_logged_in() {
@@ -84,7 +84,7 @@ function formatBytes($size, $precision = 2) {
     return round(pow(1024, $base - floor($base)), $precision) . ' ' . $units[floor($base)];
 }
 
-// Type options per creazione colonne
+// Type options for creating columns
 function type_options_html($selected = "") {
     $types = ['INTEGER', 'TEXT', 'REAL', 'BLOB', 'NUMERIC', 'BOOLEAN', 'DATETIME'];
     $html = "";
@@ -96,18 +96,18 @@ function type_options_html($selected = "") {
 }
 
 
-// Funzione per svuotare una tabella specificata
+// Function to empty a specified table
 function dropTableData($table, $pdo) {
-    $table = preg_replace('/[^a-zA-Z0-9_]/', '', $table); // Sanitizzazione semplice nome tabella
+    $table = preg_replace('/[^a-zA-Z0-9_]/', '', $table); // Simple table name sanitization
     if (!$table) {
         throw new Exception("Nome tabella non valido.");
     }
-    // Esegue "DELETE FROM table" per svuotare la tabella senza eliminarla
+    // Runs "DELETE FROM table" to empty the table without deleting it
     $pdo->exec("DELETE FROM \"$table\""); 
 }
 
 
-// ============ GESTIONE RICHIESTE ============
+// ============ REQUEST MANAGEMENT ============
 $page = $_GET['page'] ?? 'dashboard';
 $dbfile = $_GET['db'] ?? '';
 $pdo = null;
@@ -133,17 +133,17 @@ if (isset($_GET['logout'])) {
     exit;
 }
 
-// Connessione database
+// Database connection
 if ($dbfile && is_logged_in()) {
     try {
         $pdo = new PDO('sqlite:' . $DATABASES_PATH . $dbfile);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     } catch (PDOException $e) {
-        $error = "Errore connessione: " . $e->getMessage();
+        $error = "Connection error: " . $e->getMessage();
     }
 }
 
-// Creazione nuovo database
+// Creation of new database
 if (isset($_POST['newdb']) && is_logged_in()) {
     $newdb = trim($_POST['newdb']);
     if ($newdb) {
@@ -154,12 +154,12 @@ if (isset($_POST['newdb']) && is_logged_in()) {
             header('Location: ?db=' . urlencode($newdb ) . '&page=dashboard');
             exit;
         } catch (PDOException $e) {
-            $error = "Errore creazione database: " . $e->getMessage();
+            $error = "Database creation error: " . $e->getMessage();
         }
     }
 }
 
-// Eliminazione database
+// Database deletion
 if (isset($_GET['deldb']) && is_logged_in()) {
     $del_db = $_GET['deldb'];
     $del_path = $DATABASES_PATH . $del_db;
@@ -170,7 +170,7 @@ if (isset($_GET['deldb']) && is_logged_in()) {
     }
 }
 
-// Rinomina database
+// Rename database
 if (isset($_POST['rename_submit']) && is_logged_in()) {
     $old_name = $_POST['db'];
     $new_name = trim($_POST['renamedb']);
@@ -196,20 +196,20 @@ if (isset($_GET['vacuum']) && $pdo && is_logged_in()) {
     }
 }
 
-// Export dati SQL o CSV
+// Export SQL or CSV data
 if (isset($_GET['export_format']) && $pdo && $dbfile && is_logged_in()) {
     $fmt = $_GET['export_format'];
-    // Se SQL, dump completo schema + dati
+    // If SQL, complete dump schema + data
     if ($fmt === 'sql') {
         header('Content-Type: application/sql');
         header('Content-Disposition: attachment; filename="'.basename($dbfile, '.db').'.sql"');
         $out = '';
-        // Esporta schema
+        // Export schema
         $tables = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")->fetchAll(PDO::FETCH_ASSOC);
         foreach ($tables as $t) {
             $out .= $t['sql'] . ";\n";
         }
-        // Esporta dati
+        // Export data
         foreach ($tables as $t) {
             $rows = $pdo->query("SELECT * FROM `{$t['name']}`")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($rows as $r) {
@@ -221,7 +221,7 @@ if (isset($_GET['export_format']) && $pdo && $dbfile && is_logged_in()) {
         echo $out;
         exit;
     }
-    // Se CSV, esporta i dati di una singola tabella
+    // If CSV, export data from a single table
     if ($fmt === 'csv') {
         $table = $_GET['table'] ?? '';
         if (!$table) {
@@ -233,9 +233,9 @@ if (isset($_GET['export_format']) && $pdo && $dbfile && is_logged_in()) {
         $out = fopen('php://output', 'w');
         $rows = $pdo->query("SELECT * FROM `$table`")->fetchAll(PDO::FETCH_ASSOC);
         if ($rows) {
-            // Intestazione colonne
+            // Column headings
             fputcsv($out, array_keys($rows[0]));
-            // Righe dati
+            // Data rows
             foreach ($rows as $r) {
                 fputcsv($out, $r);
             }
@@ -245,7 +245,7 @@ if (isset($_GET['export_format']) && $pdo && $dbfile && is_logged_in()) {
     }
 }
 
-// Import dati CSV o SQL
+// Import CSV or SQL data
 if (isset($_POST['import_submit']) && $pdo && is_logged_in()) {
     $fmt = $_POST['import_format'] ?? '';
     $tmp = $_FILES['import_file']['tmp_name'] ?? '';
@@ -263,22 +263,22 @@ if (isset($_POST['import_submit']) && $pdo && is_logged_in()) {
             }
         } else {
             // Import CSV
-            // Leggi opzioni
+            // Read options
             $delim = $_POST['csv_term']  ?? ',';
             $enc   = $_POST['csv_encl']  ?? '"';
             $esc   = $_POST['csv_esc']   ?? '\\';
             $null  = $_POST['csv_null']  ?? '';
             $hdr   = isset($_POST['csv_header']);
-            // Tabella target (passala via GET o imposta variabile)
+            // Target table (pass it via GET or set variable)
             $browse_table = $_GET['table'] ?? '';
             if (!$browse_table) {
-                $import_error = "Seleziona una tabella per CSV import";
+                $import_error = "Select a table for CSV import";
             } else {
                 $f = fopen($tmp, 'r');
                 if (!$f) {
-                    $import_error = "Impossibile aprire file CSV";
+                    $import_error = "Unable to open CSV file";
                 } else {
-                    // Prendi metadati tabella
+                    // Get table metadata
                     $table_info = $pdo->query("PRAGMA table_info(`$browse_table`)")->fetchAll(PDO::FETCH_ASSOC);
                     $columns = [];
                     if ($hdr) {
@@ -291,30 +291,30 @@ if (isset($_POST['import_submit']) && $pdo && is_logged_in()) {
                         }
                     }
                     if (!$columns) {
-                        $import_error = "Impossibile determinare le colonne";
+                        $import_error = "Unable to determine columns";
                         fclose($f);
                     } else {
-                        // Prepara INSERT
+                        // Prepare INSERT
                         $placeholders = implode(',', array_fill(0, count($columns), '?'));
                         $col_list = implode('`,`', $columns);
                         $stmt = $pdo->prepare("INSERT INTO `$browse_table` (`$col_list`) VALUES ($placeholders)");
                         $error_occurred = false;
                         while (($row = fgetcsv($f, 0, $delim, $enc, $esc)) !== false) {
-                            // Sostituisci stringhe vuote con NULL se richiesto
+                            // Replace empty strings with NULL if required
                             foreach ($row as &$v) {
                                 if ($v === '' && $null !== '') $v = $null;
                             }
                             try {
                                 $stmt->execute($row);
                             } catch (Exception $e) {
-                                $import_error = "Errore import CSV: " . $e->getMessage();
+                                $import_error = "CSV import error: " . $e->getMessage();
                                 $error_occurred = true;
                                 break;
                             }
                         }
                         fclose($f);
                         if (!$error_occurred) {
-                            $import_success = "CSV import completato";
+                            $import_success = "CSV import completed";
                         }
                     }
                 }
@@ -323,15 +323,15 @@ if (isset($_POST['import_submit']) && $pdo && is_logged_in()) {
     }
 }
 
-// Gestione download BLOB (anteprima / scarica)
+// Blob download management (preview / download)
 if (isset($_GET['download_blob']) && $pdo && isset($_GET['table']) && isset($_GET['col']) && isset($_GET['rowid']) && is_logged_in()) {
     $dl_table = $_GET['table'];
     $dl_col = $_GET['col'];
     $dl_rowid = intval($_GET['rowid']);
-    // validazione nome tabella
+    // table name validation
     $valid_tables = $pdo->query("SELECT name FROM sqlite_master WHERE type='table'")->fetchAll(PDO::FETCH_COLUMN);
     if (!in_array($dl_table, $valid_tables)) { http_response_code(400); exit; }
-    // check colonne
+    // check columns
     $ti = $pdo->query("PRAGMA table_info(`$dl_table`)")->fetchAll(PDO::FETCH_ASSOC);
     $colnames = array_column($ti, 'name');
     if (!in_array($dl_col, $colnames)) { http_response_code(400); exit; }
@@ -340,7 +340,7 @@ if (isset($_GET['download_blob']) && $pdo && isset($_GET['table']) && isset($_GE
     $stmt->execute();
     $val = $stmt->fetchColumn();
     if ($val === false) { http_response_code(404); exit; }
-    // detect mime per immagini
+    // detect mime for images
     $mime = 'application/octet-stream';
     $imginfo = @getimagesizefromstring($val);
     if ($imginfo && isset($imginfo['mime'])) $mime = $imginfo['mime'];
@@ -350,7 +350,7 @@ if (isset($_GET['download_blob']) && $pdo && isset($_GET['table']) && isset($_GE
     exit;
 }
 
-// Creazione tabella
+// Table creation
 if ($pdo && $page === 'crea_tabella' && isset($_POST['newtable']) && $_POST['newtable'] && is_logged_in()) {
     $tablename = preg_replace("/[^a-zA-Z0-9_]/", "", $_POST['newtable']);
     $fields_sql = [];
@@ -373,7 +373,7 @@ if ($pdo && $page === 'crea_tabella' && isset($_POST['newtable']) && $_POST['new
     header("Location: ?db=$dbfile&page=tabelle"); exit;
 }
 
-// Modifica struttura tabella
+// Edit table structure
 if ($pdo && $page === 'structure' && isset($_GET['table']) && is_logged_in()) {
     $table = $_GET['table'];
     $error_structure = "";
@@ -382,6 +382,10 @@ if ($pdo && $page === 'structure' && isset($_GET['table']) && is_logged_in()) {
         $old_col_names = array_column($old_cols, 'name');
         $new_cols = [];
         for ($i=0; $i<count($_POST['col_oldname']); $i++) {
+    // ADD THIS LINE:
+    if (isset($_POST['delcol']) && in_array($i, $_POST['delcol'])) {
+        continue; // Skip this column if it is marked for deletion
+    }
             $colname = trim($_POST['col_newname'][$i]);
             if ($colname === '') continue;
             $colname = preg_replace("/[^a-zA-Z0-9_]/", "", $colname);
@@ -399,7 +403,7 @@ if ($pdo && $page === 'structure' && isset($_GET['table']) && is_logged_in()) {
             ];
         }
         if (count($new_cols) < 1) {
-            $error_structure = "Serve almeno una colonna per creare la tabella.";
+            $error_structure = "At least one column is needed to create the table.";
         } else {
             try {
                 $pdo->beginTransaction();
@@ -422,13 +426,13 @@ if ($pdo && $page === 'structure' && isset($_GET['table']) && is_logged_in()) {
                 $pdo->commit();
             } catch (Exception $e) {
                 $pdo->rollBack();
-                $error_structure = "Errore durante la modifica struttura: " . $e->getMessage();
+                $error_structure = "Error while editing structure: " . $e->getMessage();
             }
         }
     }
 }
 
-// Esecuzione query SQL
+// SQL query execution
 if ($pdo && $page === 'sql' && isset($_POST['sql']) && is_logged_in()) {
     try {
         $stm = $pdo->query($_POST['sql']);
@@ -445,7 +449,7 @@ if ($pdo && $page === 'sql' && isset($_POST['sql']) && is_logged_in()) {
             $query_result .= "</table>";
         } else $query_result = "Query OK.";
     } catch (Exception $e) {
-        $query_result = "Errore: " . htmlspecialchars($e->getMessage());
+        $query_result = "Error: " . htmlspecialchars($e->getMessage());
     }
 } else {
     $query_result = "";
@@ -455,7 +459,7 @@ if ($pdo && $page === 'sql' && isset($_POST['sql']) && is_logged_in()) {
 if ($pdo && $page === 'browse' && isset($_GET['table']) && is_logged_in()) {
     $browse_table = $_GET['table'];
     
-    // Eliminazione record
+    // Record deletion
     if (isset($_GET['delrow'])) {
         $delrow = (int)$_GET['delrow'];
         try {
@@ -463,11 +467,11 @@ if ($pdo && $page === 'browse' && isset($_GET['table']) && is_logged_in()) {
             header("Location: ?db=".urlencode($dbfile)."&page=browse&table=".urlencode($browse_table));
             exit;
         } catch (Exception $e) {
-            $browse_error = "Errore eliminazione record: " . $e->getMessage();
+            $browse_error = "Error deleting records: " . $e->getMessage();
         }
     }
     
-    // Inserimento nuovo record
+    // Inserting a new record
     if (isset($_POST['insert_record'])) {
         $table_info = $pdo->query("PRAGMA table_info(`$browse_table`)")->fetchAll(PDO::FETCH_ASSOC);
         $fields = [];
@@ -480,7 +484,7 @@ if ($pdo && $page === 'browse' && isset($_GET['table']) && is_logged_in()) {
             if ($raw === '') {
                 $values[] = 'NULL';
             } else {
-                // Per tipi numerici, lascio così; per le date, converto in ISO
+                // For numeric types, I leave it as is; for dates, I convert to ISO
                 if (stripos($col['type'], 'INT') === 0 || stripos($col['type'], 'REAL') === 0) {
                     $values[] = $pdo->quote($raw);
                 } elseif (stripos($col['type'], 'DATE') !== false) {
@@ -497,16 +501,16 @@ if ($pdo && $page === 'browse' && isset($_GET['table']) && is_logged_in()) {
             header("Location: ?db=".urlencode($dbfile)."&page=browse&table=".urlencode($browse_table));
             exit;
         } catch (Exception $e) {
-            $browse_error = "Errore inserimento record: " . $e->getMessage();
+            $browse_error = "Record insertion error: " . $e->getMessage();
         }
     }
     
-    // Salvataggio modifiche
+    // Saving changes
     if (isset($_POST['save_edits']) && isset($_POST['rowid'])) {
         try {
             $pdo->beginTransaction();
             $cols = json_decode($_POST['cols'], true);
-            // prendi metadati tipi colonne
+            // Get metadata column types
             $table_info = $pdo->query("PRAGMA table_info(`$browse_table`)")->fetchAll(PDO::FETCH_ASSOC);
             $col_types = [];
             foreach ($table_info as $ci) $col_types[$ci['name']] = $ci['type'];
@@ -517,7 +521,7 @@ if ($pdo && $page === 'browse' && isset($_GET['table']) && is_logged_in()) {
                     if ($col == 'rowid') continue;
                     $ctype = $col_types[$col] ?? '';
                     if (stripos($ctype, 'BLOB') !== false) {
-                        // file upload per BLOB? nome campo: new_$col[]
+                        // File upload for BLOB? Field name: new_$col[]
                         if (isset($_FILES['new_'.$col]) && isset($_FILES['new_'.$col]['error'][$r]) && $_FILES['new_'.$col]['error'][$r] === UPLOAD_ERR_OK && $_FILES['new_'.$col]['size'][$r] > 0) {
                             $tmp = $_FILES['new_'.$col]['tmp_name'][$r];
                             $data = file_get_contents($tmp);
@@ -526,7 +530,7 @@ if ($pdo && $page === 'browse' && isset($_GET['table']) && is_logged_in()) {
                             $stmt->bindValue(':rid', $rowid, PDO::PARAM_INT);
                             $stmt->execute();
                         }
-                        // altrimenti mantieni il valore corrente
+                        // otherwise keep the current value
                     } else {
                         $val = isset($_POST[$col][$r]) ? $_POST[$col][$r] : '';
                         if ($val === '') $val_escaped = 'NULL';
@@ -545,15 +549,15 @@ if ($pdo && $page === 'browse' && isset($_GET['table']) && is_logged_in()) {
             exit;
         } catch (Exception $e) {
             $pdo->rollBack();
-            $browse_error = "Errore salvataggio modifiche: " . $e->getMessage();
+            $browse_error = "Error saving changes: " . $e->getMessage();
         }
     }
     
-    // Recupera dati per la visualizzazione
+    // Retrieve data for viewing
     $browse_data = $pdo->query("SELECT rowid, * FROM `$browse_table` LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Eliminazione tabella
+// Table deletion
 if ($pdo && $page === 'tabelle' && isset($_GET['deltable']) && is_logged_in()) {
     $toDel = preg_replace('/[^a-zA-Z0-9_]/','', $_GET['deltable']);
     try {
@@ -561,7 +565,7 @@ if ($pdo && $page === 'tabelle' && isset($_GET['deltable']) && is_logged_in()) {
         header("Location: ?db=".urlencode($dbfile)."&page=tabelle");
         exit;
     } catch (Exception $e) {
-        $delete_table_error = "Errore eliminazione tabella: " . $e->getMessage();
+        $delete_table_error = "Error deleting table: " . $e->getMessage();
     }
 }
 
@@ -569,8 +573,8 @@ if ($pdo && $page === 'tabelle' && isset($_GET['deltable']) && is_logged_in()) {
 if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) && $pdo && is_logged_in()) {
     $tbl = preg_replace('/[^a-zA-Z0-9_]/','', $_GET['table']);
     if (isset($_POST['confirm_truncate'])) {
-        // Gestione richiesta DROP (svuotamento tabella)
-        // Svuota tabella
+        // DROP request management (table emptying)
+        // Empty table
         $pdo->exec("DELETE FROM `$tbl`;");
         if (!empty($_POST['vacuum_after'])) {
             $pdo->exec("VACUUM;");
@@ -625,7 +629,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
         line-height: 1.6;
     }
 
-    /* ============ HEADER MODERNO ============ */
+    /* ============ MODERN HEADER ============ */
     .header {
         background: var(--card-bg);
         border-bottom: 1px solid var(--border);
@@ -680,7 +684,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
         color: var(--primary);
     }
 
-    /* ============ LAYOUT PRINCIPALE ============ */
+    /* ============ MAIN LAYOUT ============ */
     .app-layout {
         display: flex;
         min-height: calc(100vh - 80px);
@@ -770,15 +774,15 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
 .db-list {
     max-height: 200px;
     overflow-y: auto;
-    -ms-overflow-style: none;  /* Nasconde scrollbar in IE e Edge */
-    scrollbar-width: none;     /* Nasconde scrollbar in Firefox */
+    -ms-overflow-style: none;  /* Hide scrollbar in IE e Edge */
+    scrollbar-width: none;     /* Hide scrollbar in Firefox */
     border: 1px solid var(--sidebar-hover);
     border-radius: var(--radius);
     padding: 0.5rem;
     background: rgba(255, 255, 255, 0.05);
 }
 
-/* Nasconde scrollbar in WebKit (Chrome, Safari) */
+/* Hide scrollbar in WebKit (Chrome, Safari) */
 .db-list::-webkit-scrollbar {
     display: none;
 }
@@ -811,7 +815,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
         text-align: center;
     }
 
-    /* Forms nella sidebar */
+    /* Forms in the sidebar */
     .sidebar-form {
         margin-bottom: 1rem;
     }
@@ -835,8 +839,8 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
 //		color: #b0abab;
 		color: #373535;
 		font-size: 0.875rem;
-        box-sizing: border-box; /* inclusi padding e bordi nel calcolo larghezza */
-		min-width: 0; /* evita overflow */
+        box-sizing: border-box; /* including padding and borders in the width calculation */
+		min-width: 0; /* avoid overflow */
     }
 
     .form-input::placeholder {
@@ -855,11 +859,11 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--sidebar-hover);
     border-radius: var(--radius);
-    background: #fff; /* o un colore diverso per distinguere */
+    background: #fff; /* or a different color to distinguish */
     color: #222;
     font-size: 0.875rem;
-    appearance: none; /* per stilizzare senza default di sistema */
-    background-image: url('data:image/svg+xml;utf8,<svg ...>'); /* opzionale freccia personalizzata */
+    appearance: none; /* to stylize without system defaults */
+    background-image: url('data:image/svg+xml;utf8,<svg ...>'); /* optional custom arrow */
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     background-size: 1rem 1rem;
@@ -993,22 +997,22 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
         padding: 1.5rem;
     }
 
-/* Mantieni table-container come wrapper scrollabile orizzontalmente */
+/* Keep table-container as a horizontally scrollable wrapper */
 .table-container {
     overflow-x: auto;
     border-radius: var(--radius);
     border: 1px solid var(--border);
 }
 
-/* Assicurati che la tabella occupi tutta la larghezza disponibile */
+/* Make sure the table takes up the full available width */
 .table {
     width: 100%;
     border-collapse: collapse;
     background: var(--card-bg);
-    min-width: 600px;  /* minima larghezza orizzontale per evitare collassi eccessivi */
+    min-width: 600px;  /* minimum horizontal width to avoid excessive collapses */
 }
 
-/* Stili dei th */
+/* Styles of the th */
 .table th {
     background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
     padding: 1rem;
@@ -1018,57 +1022,57 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
     border-bottom: 2px solid var(--border);
 }
 
-/* Stili td */
+/* Styles of the td */
 .table td {
     padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border);
     color: #4b5563;
-    white-space: nowrap;  /* evita che contenuti vanno a capo dentro la cella */
+    white-space: nowrap;  /* prevents content from wrapping inside the cell */
 }
 
 .table td input.form-input {
-    width: auto;             /* rimuove width:100% per non limitare la larghezza */
-    min-width: 15rem;         /* larghezza minima ragionevole per usabilità */
-    max-width: 100%;         /* non uscire mai fuori dalla cella */
-    box-sizing: border-box;  /* include padding e bordo nel calcolo della larghezza */
+    width: auto;             /* remove width:100% to not limit the width */
+    min-width: 15rem;         /* minimum reasonable width for usability */
+    max-width: 100%;         /* never leave the cell */
+    box-sizing: border-box;  /* includes padding and border in width calculation */
 }
 
-/* Media query per migliorare su schermi piccoli */
+/* Media queries for improvement on small screens */
 @media (max-width: 600px) {
     .table td input.form-input {
-        min-width: 6rem;     /* più stretti ma ancora leggibili */
+        min-width: 6rem;     /* narrower but still readable */
         font-size: 0.9rem;
     }
 }
 
-/* Hover sulla riga */
+/* Hover on the line */
 .table tbody tr:hover {
     background: #f9fafb;
 }
 
-/* Media query per schermi piccoli */
+/* Media queries for small screens */
 @media (max-width: 600px) {
     .table {
-        min-width: auto; /* rimuove min-width per adattarsi meglio al container */
+        min-width: auto; /* removes min-width to better fit the container */
     }
 
-    /* Bottone inline nei td con wrap orizzontale */
+    /* Inline button in td with horizontal wrap */
     .table td > button {
-        white-space: normal; /* consente l’andare a capo */
-        display: inline-block; /* forza layout inline */
+        white-space: normal; /* allows you to start a new line */
+        display: inline-block; /* force inline layout */
         margin-right: 0.25rem;
-        margin-bottom: 0.25rem; /* margine per separare bottoni se vanno a capo */
+        margin-bottom: 0.25rem; /* margin to separate buttons if they go to a new line */
         vertical-align: middle;
     }
 
-    /* Opzionale: fare i bottoni più piccoli per mobile */
+    /* Optional: Make the buttons smaller per piece of furniture */
     .table td > button {
         font-size: 0.85rem;
         padding: 0.25rem 0.5rem;
     }
 
 	.form-input {
-        font-size: 1rem;  /* dimensione leggermente più grande per leggibilità */
+        font-size: 1rem;  /* slightly larger size for readability */
         padding: 0.5rem;
     }
 }
@@ -1192,7 +1196,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
     .gap-2 { gap: 1rem; }
     .w-full { width: 100%; }
 
-    /* Login form speciale */
+    /* Special form login */
     .login-container {
         min-height: 100vh;
         display: flex;
@@ -1339,7 +1343,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
             <div class="login-card">
                 <div class="login-header">
                     <i class="fas fa-lock"></i>
-                    <h2 class="login-title">Accedi a <?= $APP_NAME ?></h2>
+                    <h2 class="login-title">Sign in <?= $APP_NAME ?></h2>
                 </div>
 
                 <?php if (isset($login_error)): ?>
@@ -1354,13 +1358,13 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                         <input type="password" 
                                name="pwd" 
                                class="form-input" 
-                               placeholder="Password amministratore" 
+                               placeholder="Administrator password" 
                                required 
                                autocomplete="current-password">
                     </div>
                     <button type="submit" name="login" class="btn btn-primary btn-full">
                         <i class="fas fa-sign-in-alt"></i>
-                        Accedi
+                        Log in
                     </button>
                 </form>
             </div>
@@ -1389,7 +1393,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                         <?php if (empty(list_databases())): ?>
                             <div class="text-center text-muted">
                                 <i class="fas fa-folder-open"></i><br>
-                                <small>Nessun database presente</small>
+                                <small>No database present</small>
                             </div>
                         <?php endif; ?>
                     </div>
@@ -1405,7 +1409,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                         </div>
                         <button type="submit" class="btn btn-success btn-full btn-sm">
                             <i class="fas fa-plus"></i>
-                            Crea Database
+                            Create Database
                         </button>
                     </form>
                 </div>
@@ -1420,14 +1424,14 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                                        name="renamedb" 
                                        value="<?= htmlspecialchars($dbfile) ?>" 
                                        class="form-input" 
-                                       placeholder="Rinomina database" 
+                                       placeholder="Rename database" 
                                        required>
                             </div>
                             <button type="submit" 
                                     name="rename_submit" 
                                     class="btn btn-warning btn-full btn-sm">
                                 <i class="fas fa-edit"></i>
-                                Rinomina
+                                Rename
                             </button>
                         </form>
                     </div>
@@ -1436,7 +1440,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                     <div class="sidebar-section">
                         <h3 class="sidebar-title">
                             <i class="fas fa-tools"></i>
-                            Strumenti
+                            Instruments
                         </h3>
 
                         <ul class="nav-menu">
@@ -1444,7 +1448,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                                 <a href="?db=<?= urlencode($dbfile) ?>&page=tabelle" 
                                    class="nav-link <?= ($page == 'tabelle') ? 'active' : '' ?>">
                                     <i class="fas fa-table"></i>
-                                    <span class="nav-link-text">Tabelle</span>
+                                    <span class="nav-link-text">Tables</span>
                                 </a>
                             </li>
 
@@ -1452,7 +1456,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                                 <a href="?db=<?= urlencode($dbfile) ?>&page=crea_tabella" 
                                    class="nav-link <?= ($page == 'crea_tabella') ? 'active' : '' ?>">
                                     <i class="fas fa-plus-square"></i>
-                                    <span class="nav-link-text">Nuova Tabella</span>
+                                    <span class="nav-link-text">New Table</span>
                                 </a>
                             </li>
 
@@ -1468,7 +1472,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                                 <a href="?db=<?= urlencode($dbfile) ?>&page=info" 
                                    class="nav-link <?= ($page == 'info') ? 'active' : '' ?>">
                                     <i class="fas fa-info-circle"></i>
-                                    <span class="nav-link-text">Info Database</span>
+                                    <span class="nav-link-text">Database Info</span>
                                 </a>
                             </li>
                         </ul>
@@ -1504,7 +1508,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                     <div class="sidebar-section">
                         <h3 class="sidebar-title">
                             <i class="fas fa-cog"></i>
-                            Azioni Database
+                            Database Actions
                         </h3>
 
                         <ul class="nav-menu">
@@ -1518,8 +1522,8 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
 
                             <li class="nav-item">
                                 <?php
-                                  // All’inizio della sidebar, subito dopo aver stabilito $pdo:
-                                  // Recupera l’elenco delle tabelle
+                                  // At the top of the sidebar, right after setting $pdo:
+                                  // Retrieve the list of tables
                                   $currenttables = $pdo
                                     ->query(
                                       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
@@ -1540,7 +1544,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                                     </div>
                                      <!-- Aggiungere qui: selettore tabella visibile solo se CSV -->
                                       <div id="csv-table-selector" class="form-group" style="display:none;">
-                                        <label>Tabella per CSV:</label>
+                                        <label>Table for CSV:</label>
                                         <select name="table" class="form-select form-input">
                                           <?php foreach($currenttables as $t): ?>
                                             <option value="<?=htmlspecialchars($t)?>"><?=htmlspecialchars($t)?></option>
@@ -1549,7 +1553,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                                       </div>
                                      <button type="submit" class="btn btn-warning btn-full btn-sm">
                                         <i class="fas fa-download"></i>
-                                        Esporta
+                                        Export
                                     </button>
                                 </form>
                                     <script>
@@ -1573,9 +1577,9 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                                     </div>
                                     <button type="submit" name="import_submit" class="btn btn-primary btn-full btn-sm">
                                         <i class="fas fa-upload"></i>
-                                        Importa
+                                        Import
                                     </button>
-                                    <!-- Opzioni CSV (nascoste di default) -->
+                                    <!-- CSV Options (hidden by default) -->
                                     <div id="csv_options" style="display:none; margin-top:.5rem;">
                                         <div class="form-group">
                                             <input name="csv_term" class="form-input" placeholder="Terminated by" value=",">
@@ -1600,9 +1604,9 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                             <li class="nav-item">
                                 <a href="?db=<?= urlencode($dbfile) ?>&deldb=<?= urlencode($dbfile) ?>&page=dashboard" 
                                    class="nav-link"
-                                   onclick="return confirm('Eliminare definitivamente il database?')">
+                                   onclick="return confirm('Permanently delete the database?')">
                                     <i class="fas fa-trash"></i>
-                                    <span class="nav-link-text">Elimina Database</span>
+                                    <span class="nav-link-text">Delete Database</span>
                                 </a>
                             </li>
                         </ul>
@@ -1756,19 +1760,19 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
             const index = container.children.length;
             const columnsOptions = `<?php foreach ($columns as $col): ?><option value="<?=htmlspecialchars($col)?>"><?=htmlspecialchars($col)?></option><?php endforeach; ?>`;
             const operatorsOptions = `
-                <option value="=">Uguale</option>
-                <option value="!=">Diverso</option>
-                <option value="<">Minore</option>
-                <option value="<=">Minore o uguale</option>
-                <option value=">">Maggiore</option>
-                <option value=">=">Maggiore o uguale</option>
-                <option value="LIKE">Contiene</option>`;
+                <option value="=">equal</option>
+                <option value="!=">Different</option>
+                <option value="<">Minor</option>
+                <option value="<=">Less than or equal</option>
+                <option value=">">Greater</option>
+                <option value=">=">Greater than or equal</option>
+                <option value="LIKE">Contains</option>`;
             const div = document.createElement('div');
             div.className = 'row g-2 mb-2 condition-row';
             div.innerHTML = `
                 <div class="col-md-4">
                     <select name="where[${index}][column]" class="form-select">
-                        <option value="">Seleziona campo</option>
+                        <option value="">Select field</option>
                         ${columnsOptions}
                     </select>
                 </div>
@@ -1781,13 +1785,13 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                     <input type="text" name="where[${index}][value]" class="form-control" placeholder="Valore">
                 </div>
                 <div class="col-md-1">
-                    <button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Rimuovi Condizione">&times;</button>
+                    <button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Remove Condition">&times;</button>
                 </div>
             `;
             container.appendChild(div);
         });
 
-        // Rimuovi condizione in query builder
+        // Remove condition in query builder
         document.getElementById('conditionsContainer')?.addEventListener('click', function(e) {
             if (e.target.classList.contains('btn-remove-condition')) {
                 e.target.closest('.condition-row').remove();
@@ -1799,7 +1803,7 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
 
 <?php
 
-// ============ FUNZIONI DELLE PAGINE ============
+// ============ PAGE FUNCTIONS ============
 
 function include_page_dashboard() {
     global $dbfile, $pdo, $DATABASES_PATH, $APP_NAME;
@@ -1810,7 +1814,7 @@ function include_page_dashboard() {
             Dashboard
         </h1>
         <p class="page-subtitle">
-            Panoramica generale dei database e statistiche
+            General overview of databases and statistics
         </p>
     </div>
 
@@ -1823,9 +1827,9 @@ function include_page_dashboard() {
                 </h3>
             </div>
             <div class="card-body">
-                <p>Seleziona un database dalla sidebar o creane uno nuovo per iniziare.</p>
+                <p>Select a database from the sidebar or create a new one to get started.</p>
                 <div class="mt-2">
-                    <strong>Database disponibili:</strong> <?= count(list_databases()) ?>
+                    <strong>Databases available:</strong> <?= count(list_databases()) ?>
                 </div>
             </div>
         </div>
@@ -1845,7 +1849,7 @@ function include_page_dashboard() {
                     $total_records += $count;
                 }
             } catch (Exception $e) {
-                // Ignora errori
+                // Ignore errors
             }
         }
         ?>
@@ -1863,35 +1867,35 @@ function include_page_dashboard() {
                         <table class="table">
                             <tbody>
                                 <tr>
-                                    <td><strong>Nome Database</strong></td>
+                                    <td><strong>Database Name</strong></td>
                                     <td><?= htmlspecialchars($info['db_name']) ?></td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Percorso</strong></td>
+                                    <td><strong>Path</strong></td>
                                     <td><?= htmlspecialchars($info['path']) ?></td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Dimensione</strong></td>
+                                    <td><strong>Size</strong></td>
                                     <td><?= htmlspecialchars($info['size']) ?></td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Ultima Modifica</strong></td>
+                                    <td><strong>Last Edit</strong></td>
                                     <td><?= htmlspecialchars($info['last_modified']) ?></td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Versione SQLite</strong></td>
+                                    <td><strong>SQLite Version</strong></td>
                                     <td><?= htmlspecialchars($info['sqlite_version']) ?></td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Estensione SQLite</strong></td>
+                                    <td><strong>SQLite Extension</strong></td>
                                     <td><?= htmlspecialchars($info['sqlite_extension']) ?></td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Versione PHP</strong></td>
+                                    <td><strong>PHP Version</strong></td>
                                     <td><?= htmlspecialchars($info['php_version']) ?></td>
                                 </tr>
                                 <tr>
-                                    <td><strong>Versione Programma</strong></td>
+                                    <td><strong>Program Version</strong></td>
                                     <td><?= htmlspecialchars($info['program_version']) ?></td>
                                 </tr>
                             </tbody>
@@ -1905,16 +1909,16 @@ function include_page_dashboard() {
             <div class="card-header">
                 <h3 class="card-title">
                     <i class="fas fa-chart-bar"></i>
-                    Statistiche
+                    Statistics
                 </h3>
             </div>
             <div class="card-body">
                 <div class="flex items-center justify-between mb-2">
-                    <span><strong>Numero di Tabelle:</strong></span>
+                    <span><strong>Number of Tables:</strong></span>
                     <span class="nav-badge"><?= $tables_count ?></span>
                 </div>
                 <div class="flex items-center justify-between">
-                    <span><strong>Totale Record:</strong></span>
+                    <span><strong>Total Records:</strong></span>
                     <span class="nav-badge"><?= number_format($total_records) ?></span>
                 </div>
             </div>
@@ -1929,10 +1933,10 @@ function include_page_tabelle() {
     <div class="page-header">
         <h1 class="page-title">
             <i class="fas fa-table"></i>
-            Tabelle
+            Tables
         </h1>
         <p class="page-subtitle">
-            Gestisci le tabelle del database <?= htmlspecialchars($dbfile) ?>
+            Manage database tables <?= htmlspecialchars($dbfile) ?>
         </p>
     </div>
 
@@ -1956,11 +1960,11 @@ function include_page_tabelle() {
             <div class="card">
                 <div class="card-body text-center">
                     <i class="fas fa-table" style="font-size: 3rem; color: var(--secondary); margin-bottom: 1rem;"></i>
-                    <h3>Nessuna tabella presente</h3>
-                    <p class="text-muted">Questo database non contiene ancora tabelle.</p>
+                    <h3>No table present</h3>
+                    <p class="text-muted">This database does not yet contain any tables.</p>
                     <a href="?db=<?= urlencode($dbfile) ?>&page=crea_tabella" class="btn btn-primary">
                         <i class="fas fa-plus"></i>
-                        Crea la prima tabella
+                        Create the first table
                     </a>
                 </div>
             </div>
@@ -1968,7 +1972,7 @@ function include_page_tabelle() {
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">
-                        Elenco Tabelle (<?= count($tables) ?>)
+                        List of Tables (<?= count($tables) ?>)
                     </h3>
                 </div>
                 <div class="card-body">
@@ -1976,9 +1980,9 @@ function include_page_tabelle() {
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Nome Tabella</th>
+                                    <th>Table Name</th>
                                     <th>Record</th>
-                                    <th class="text-center">Azioni</th>
+                                    <th class="text-center">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -2007,18 +2011,18 @@ function include_page_tabelle() {
                                             <a href="?db=<?= urlencode($dbfile) ?>&page=structure&table=<?= urlencode($table['name']) ?>" 
                                                class="btn btn-warning btn-sm">
                                                 <i class="fas fa-cogs"></i>
-                                                Struttura
+                                                Structure
                                             </a>
                                             <a href="?db=<?=urlencode($dbfile)?>&amp;page=truncate&amp;table=<?=urlencode($table['name'])?>" 
                                                class="btn btn-danger btn-sm">
                                                <i class="fas fa-eraser"></i>
-                                                Svuota
+                                                Empty
                                             </a>
                                             <a href="?db=<?= urlencode($dbfile) ?>&page=tabelle&deltable=<?= urlencode($table['name']) ?>" 
                                                class="btn btn-danger btn-sm" 
                                                onclick="return confirm('Sei sicuro di voler eliminare la tabella <?= htmlspecialchars($table['name']) ?>?')">
                                                 <i class="fas fa-trash"></i>
-                                                Elimina
+                                                Delete
                                             </a>
                                         </td>
                                     </tr>
@@ -2032,7 +2036,7 @@ function include_page_tabelle() {
     <?php else: ?>
         <div class="alert alert-error">
             <i class="fas fa-exclamation-triangle"></i>
-            Impossibile connettersi al database.
+            Unable to connect to database.
         </div>
     <?php endif; ?>
     <?php
@@ -2044,32 +2048,32 @@ function include_page_crea_tabella() {
     <div class="page-header">
         <h1 class="page-title">
             <i class="fas fa-plus-square"></i>
-            Crea Nuova Tabella
+            Create New Table
         </h1>
         <p class="page-subtitle">
-            Aggiungi una nuova tabella al database <?= htmlspecialchars($dbfile) ?>
+            Add a new table to the database <?= htmlspecialchars($dbfile) ?>
         </p>
     </div>
 
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">Configurazione Tabella</h3>
+            <h3 class="card-title">Table Configuration</h3>
         </div>
         <div class="card-body">
             <form method="post" class="mb-3">
                 <div class="form-group mb-3">
-                    <label for="newtable" class="form-label">Nome Tabella</label>
+                    <label for="newtable" class="form-label">Table Name</label>
                     <input type="text" class="form-input" id="newtable" name="newtable" required>
                 </div>
 
-                <h4 class="mb-3">Colonne</h4>
+                <h4 class="mb-3">Columns</h4>
                 
                 <div class="table-container mb-3">
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Nome</th>
-                                <th>Tipo</th>
+                                <th>Name</th>
+                                <th>Type</th>
                                 <th>PK</th>
                                 <th>AI</th>
                                 <th>Not Null</th>
@@ -2111,7 +2115,7 @@ function include_page_crea_tabella() {
 
                 <button type="submit" class="btn btn-success">
                     <i class="fas fa-plus"></i>
-                    Crea Tabella
+                    Create Table
                 </button>
             </form>
         </div>
@@ -2124,14 +2128,14 @@ function include_page_sql() {
     $result = null;
     $query_error = null;
     
-    // Recupera liste tabelle dal database PDO
+    // Retrieve table lists from PDO database
     $tables = [];
     if ($pdo) {
         $resTables = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
         $tables = $resTables->fetchAll(PDO::FETCH_COLUMN);
     }
     
-    // Funzione per ottenere i nomi delle colonne di una tabella
+    // Function to get the names of the columns of a table
     function getTableColumns($table, $pdo) {
         $columns = [];
         if ($table && $pdo) {
@@ -2146,7 +2150,7 @@ function include_page_sql() {
     $built_query = '';
     $queryType = $_POST['querytype'] ?? 'SELECT';
     
-    // Costruisce la query se richiesta (ma non la esegue)
+    // Builds the query if requested (but does not execute it)
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['build_query'])) {
         switch($queryType) {
             case 'SELECT':
@@ -2304,7 +2308,7 @@ function include_page_sql() {
         }
     }
     
-    // Esegui SOLO se è stata inviata una query manualmente
+    // Run ONLY if a query has been submitted manually
     if (isset($_POST['sql']) && $pdo) {
         $sql = trim($_POST['sql']);
         if ($sql) {
@@ -2314,7 +2318,7 @@ function include_page_sql() {
                     $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 } else {
                     $affected = $pdo->exec($sql);
-                    $result = "Query eseguita con successo. Righe interessate: " . $affected;
+                    $result = "The query was successful. Affected rows: " . $affected;
                 }
             } catch (PDOException $e) {
                 $query_error = $e->getMessage();
@@ -2328,7 +2332,7 @@ function include_page_sql() {
             Query SQL
         </h1>
         <p class="page-subtitle">
-            Esegui query SQL personalizzate su <?= htmlspecialchars($dbfile) ?>
+            Run custom SQL queries on <?= htmlspecialchars($dbfile) ?>
         </p>
     </div>
     
@@ -2337,14 +2341,14 @@ function include_page_sql() {
         <div class="card-header">
             <h3 class="card-title">
                 <i class="fas fa-cogs"></i>
-                Costruttore di Query
+                Query Builder
             </h3>
         </div>
         <div class="card-body">
             <form method="post" class="mb-3" id="queryBuilderForm">
-                <!-- Selettore tipo query -->
+                <!-- Query type selector -->
                 <div class="form-group mb-3">
-                    <label for="queryType" class="form-label">Tipo di Query</label>
+                    <label for="queryType" class="form-label">Query Type</label>
                     <select id="queryType" name="querytype" class="form-input" onchange="this.form.submit()">
                         <option value="SELECT" <?= $queryType === 'SELECT' ? 'selected' : '' ?>>SELECT</option>
                         <option value="INSERT" <?= $queryType === 'INSERT' ? 'selected' : '' ?>>INSERT</option>
@@ -2356,9 +2360,9 @@ function include_page_sql() {
                 
                 <?php if ($queryType === 'SELECT'): ?>
                     <div class="form-group mb-3">
-                        <label for="tableSelect" class="form-label">Seleziona Tabella</label>
+                        <label for="tableSelect" class="form-label">Select Table</label>
                         <select id="tableSelect" name="table" class="form-input" onchange="this.form.submit()" required>
-                            <option value="">-- Scegli una tabella --</option>
+                            <option value="">-- Choose a table --</option>
                             <?php foreach ($tables as $tbl): ?>
                                 <option value="<?= htmlspecialchars($tbl) ?>" <?= ($tbl === $table) ? 'selected' : '' ?>><?= htmlspecialchars($tbl) ?></option>
                             <?php endforeach; ?>
@@ -2367,17 +2371,17 @@ function include_page_sql() {
                     
                     <?php if ($table): ?>
                         <div class="form-group mb-3">
-                            <label for="fieldsSelect" class="form-label">Seleziona Campi</label>
+                            <label for="fieldsSelect" class="form-label">Select Fields</label>
                             <select id="fieldsSelect" name="fields[]" class="form-input" multiple size="5">
                                 <?php foreach ($columns as $col): ?>
                                     <option value="<?= htmlspecialchars($col) ?>" <?php if (in_array($col, $_POST['fields'] ?? [])) echo 'selected' ?>><?= htmlspecialchars($col) ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="text-muted">Tieni premuto Ctrl/Cmd per selezionare più campi. Lascia vuoto per SELECT *</div>
+                            <div class="text-muted">Hold down Ctrl/Cmd to select multiple fields. Leave blank for SELECT *</div>
                         </div>
                         
                         <div class="form-group mb-3">
-                            <label class="form-label">Condizioni (WHERE)</label>
+                            <label class="form-label">Conditions (WHERE)</label>
                             <div id="conditionsContainer">
                                 <?php
                                 $conditions = $_POST['where'] ?? [[]];
@@ -2385,7 +2389,7 @@ function include_page_sql() {
                                 ?>
                                 <div class="condition-row">
                                     <select name="where[<?=$index?>][column]" class="form-input">
-                                        <option value="">Seleziona campo</option>
+                                        <option value="">Select field</option>
                                         <?php foreach ($columns as $col): ?>
                                             <option value="<?= htmlspecialchars($col) ?>" <?php if (($cond['column']??'') === $col) echo 'selected' ?>><?= htmlspecialchars($col) ?></option>
                                         <?php endforeach; ?>
@@ -2398,14 +2402,14 @@ function include_page_sql() {
                                         <option value="<?=$op?>" <?php if (($cond['operator']??'') === $op) echo 'selected' ?>><?=$label?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <input type="text" name="where[<?=$index?>][value]" class="form-input" placeholder="Valore" value="<?= htmlspecialchars($cond['value'] ?? '') ?>">
-                                    <button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Rimuovi Condizione">&times;</button>
+                                    <input type="text" name="where[<?=$index?>][value]" class="form-input" placeholder="Value" value="<?= htmlspecialchars($cond['value'] ?? '') ?>">
+                                    <button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Remove Condition">&times;</button>
                                 </div>
                                 <?php endforeach; ?>
                             </div>
                             <button type="button" id="addConditionBtn" class="btn btn-outline btn-sm mt-2" onclick="addCondition()">
                                 <i class="fas fa-plus"></i>
-                                Aggiungi condizione
+                                Add condition
                             </button>
                         </div>
                         
@@ -2420,14 +2424,14 @@ function include_page_sql() {
                                     </option>
                                 <?php endforeach ?>
                             </select>
-                            <small class="text-muted">Tieni premuto Ctrl/Cmd per selezioni multiple.</small>
+                            <small class="text-muted">Hold down Ctrl/Cmd for multiple selections.</small>
                         </div>
                         
                         <!-- ORDER BY -->
                         <div class="form-group mb-3">
                             <label for="orderBySelect" class="form-label">ORDER BY</label>
                             <select id="orderBySelect" name="orderby" class="form-input">
-                                <option value="">Nessuno</option>
+                                <option value="">Nobody</option>
                                 <?php foreach ($columns as $col): ?>
                                     <option value="<?= htmlspecialchars($col) ?>"
                                         <?= ($_POST['orderby'] ?? '') === $col ? 'selected' : '' ?>>
@@ -2445,23 +2449,23 @@ function include_page_sql() {
                         <div class="form-group mb-3">
                             <label for="limitInput" class="form-label">LIMIT</label>
                             <input type="number" id="limitInput" name="limit" class="form-input" min="1"
-                                   value="<?= htmlspecialchars($_POST['limit'] ?? '') ?>" placeholder="Numero di righe">
+                                   value="<?= htmlspecialchars($_POST['limit'] ?? '') ?>" placeholder="Number of lines">
                         </div>
                     <?php endif; ?>
                 <?php endif; ?>
                 
                 <?php if ($queryType === 'INSERT'): ?>
                     <div class="form-group mb-3">
-                        <label for="insertTable" class="form-label">Tabella</label>
+                        <label for="insertTable" class="form-label">Table</label>
                         <select id="insertTable" name="insert_table" class="form-input" required>
-                            <option value="">-- Scegli una tabella --</option>
+                            <option value="">-- Choose a table --</option>
                             <?php foreach ($tables as $tbl): ?>
                                 <option value="<?= htmlspecialchars($tbl) ?>" <?= ($_POST['insert_table'] ?? '') === $tbl ? 'selected' : '' ?>><?= htmlspecialchars($tbl) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group mb-3">
-                        <label class="form-label">Colonne e Valori</label>
+                        <label class="form-label">Columns and Values</label>
                         <div id="insertCols">
                             <?php
                             $cols = $_POST['insert_cols'] ?? [''];
@@ -2469,21 +2473,21 @@ function include_page_sql() {
                             foreach ($cols as $i => $col):
                             ?>
                             <div class="d-flex mb-2">
-                                <input name="insert_cols[]" class="form-input me-2" placeholder="Colonna" value="<?= htmlspecialchars($col) ?>">
-                                <input name="insert_vals[]" class="form-input" placeholder="Valore" value="<?= htmlspecialchars($vals[$i] ?? '') ?>">
+                                <input name="insert_cols[]" class="form-input me-2" placeholder="Column" value="<?= htmlspecialchars($col) ?>">
+                                <input name="insert_vals[]" class="form-input" placeholder="Value" value="<?= htmlspecialchars($vals[$i] ?? '') ?>">
                                 <button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentNode.remove()">&times;</button>
                             </div>
                             <?php endforeach; ?>
                         </div>
-                        <button type="button" class="btn btn-outline btn-sm" onclick="addInsertField()">+ Aggiungi coppia</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="addInsertField()">+ Add pair</button>
                     </div>
                 <?php endif; ?>
                 
                 <?php if ($queryType === 'UPDATE'): ?>
                     <div class="form-group mb-3">
-                        <label for="updateTable" class="form-label">Tabella</label>
+                        <label for="updateTable" class="form-label">Table</label>
                         <select id="updateTable" name="update_table" class="form-input" onchange="this.form.submit()" required>
-                            <option value="">-- Scegli una tabella --</option>
+                            <option value="">-- Choose a table --</option>
                             <?php foreach ($tables as $tbl): ?>
                                 <option value="<?= htmlspecialchars($tbl) ?>" <?= ($_POST['update_table'] ?? '') === $tbl ? 'selected' : '' ?>><?= htmlspecialchars($tbl) ?></option>
                             <?php endforeach; ?>
@@ -2504,22 +2508,22 @@ function include_page_sql() {
                             ?>
                             <div class="d-flex mb-2">
                                 <select name="update_set[<?= $i ?>][col]" class="form-input me-2">
-                                    <option value="">Seleziona colonna</option>
+                                    <option value="">Select column</option>
                                     <?php foreach ($updateColumns as $col): ?>
                                         <option value="<?= htmlspecialchars($col) ?>" <?= $sv['col'] === $col ? 'selected' : '' ?>><?= htmlspecialchars($col) ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                                <input name="update_set[<?= $i ?>][val]" class="form-input" placeholder="Nuovo valore" value="<?= htmlspecialchars($sv['val']) ?>">
+                                <input name="update_set[<?= $i ?>][val]" class="form-input" placeholder="New value" value="<?= htmlspecialchars($sv['val']) ?>">
                                 <button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentNode.remove()">&times;</button>
                             </div>
                             <?php endforeach; ?>
                         </div>
-                        <button type="button" class="btn btn-outline btn-sm" onclick="addUpdateField()">+ Aggiungi</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="addUpdateField()">+ Add</button>
                     </div>
                     
                     <?php if ($updateTable): ?>
                         <div class="form-group mb-3">
-                            <label class="form-label">Condizioni (WHERE)</label>
+                            <label class="form-label">Conditions (WHERE)</label>
                             <div id="updateConditionsContainer">
                                 <?php
                                 $conditions = $_POST['where'] ?? [[]];
@@ -2527,7 +2531,7 @@ function include_page_sql() {
                                 ?>
                                 <div class="condition-row">
                                     <select name="where[<?=$index?>][column]" class="form-input">
-                                        <option value="">Seleziona campo</option>
+                                        <option value="">Select field</option>
                                         <?php foreach ($updateColumns as $col): ?>
                                             <option value="<?= htmlspecialchars($col) ?>" <?php if (($cond['column']??'') === $col) echo 'selected' ?>><?= htmlspecialchars($col) ?></option>
                                         <?php endforeach; ?>
@@ -2541,13 +2545,13 @@ function include_page_sql() {
                                         <?php endforeach; ?>
                                     </select>
                                     <input type="text" name="where[<?=$index?>][value]" class="form-input" placeholder="Valore" value="<?= htmlspecialchars($cond['value'] ?? '') ?>">
-                                    <button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Rimuovi Condizione">&times;</button>
+                                    <button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Remove Condition">&times;</button>
                                 </div>
                                 <?php endforeach; ?>
                             </div>
                             <button type="button" class="btn btn-outline btn-sm mt-2" onclick="addUpdateCondition()">
                                 <i class="fas fa-plus"></i>
-                                Aggiungi condizione
+                                Add condition
                             </button>
                         </div>
                     <?php endif; ?>
@@ -2555,9 +2559,9 @@ function include_page_sql() {
                 
                 <?php if ($queryType === 'DELETE'): ?>
                     <div class="form-group mb-3">
-                        <label for="deleteTable" class="form-label">Tabella</label>
+                        <label for="deleteTable" class="form-label">Table</label>
                         <select id="deleteTable" name="delete_table" class="form-input" onchange="this.form.submit()" required>
-                            <option value="">-- Scegli una tabella --</option>
+                            <option value="">-- Choose a table --</option>
                             <?php foreach ($tables as $tbl): ?>
                                 <option value="<?= htmlspecialchars($tbl) ?>" <?= ($_POST['delete_table'] ?? '') === $tbl ? 'selected' : '' ?>><?= htmlspecialchars($tbl) ?></option>
                             <?php endforeach; ?>
@@ -2571,7 +2575,7 @@ function include_page_sql() {
                     
                     <?php if ($deleteTable): ?>
                         <div class="form-group mb-3">
-                            <label class="form-label">Condizioni (WHERE)</label>
+                            <label class="form-label">Conditions (WHERE)</label>
                             <div id="deleteConditionsContainer">
                                 <?php
                                 $conditions = $_POST['where'] ?? [[]];
@@ -2579,7 +2583,7 @@ function include_page_sql() {
                                 ?>
                                 <div class="condition-row">
                                     <select name="where[<?=$index?>][column]" class="form-input">
-                                        <option value="">Seleziona campo</option>
+                                        <option value="">Select field</option>
                                         <?php foreach ($deleteColumns as $col): ?>
                                             <option value="<?= htmlspecialchars($col) ?>" <?php if (($cond['column']??'') === $col) echo 'selected' ?>><?= htmlspecialchars($col) ?></option>
                                         <?php endforeach; ?>
@@ -2592,14 +2596,14 @@ function include_page_sql() {
                                         <option value="<?=$op?>" <?php if (($cond['operator']??'') === $op) echo 'selected' ?>><?=$label?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <input type="text" name="where[<?=$index?>][value]" class="form-input" placeholder="Valore" value="<?= htmlspecialchars($cond['value'] ?? '') ?>">
-                                    <button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Rimuovi Condizione">&times;</button>
+                                    <input type="text" name="where[<?=$index?>][value]" class="form-input" placeholder="Value" value="<?= htmlspecialchars($cond['value'] ?? '') ?>">
+                                    <button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Remove Condition">&times;</button>
                                 </div>
                                 <?php endforeach; ?>
                             </div>
                             <button type="button" class="btn btn-outline btn-sm mt-2" onclick="addDeleteCondition()">
                                 <i class="fas fa-plus"></i>
-                                Aggiungi condizione
+                                Add condition
                             </button>
                         </div>
                     <?php endif; ?>
@@ -2607,49 +2611,49 @@ function include_page_sql() {
                 
                 <?php if ($queryType === 'CREATE'): ?>
                     <div class="form-group mb-3">
-                        <label for="createTable" class="form-label">Nome tabella</label>
-                        <input id="createTable" name="create_table" class="form-input" value="<?= htmlspecialchars($_POST['create_table'] ?? '') ?>" placeholder="Nome della nuova tabella" required>
+                        <label for="createTable" class="form-label">Table Name</label>
+                        <input id="createTable" name="create_table" class="form-input" value="<?= htmlspecialchars($_POST['create_table'] ?? '') ?>" placeholder="Name of the new table" required>
                     </div>
                     <div class="form-group mb-3">
-                        <label class="form-label">Campi</label>
+                        <label class="form-label">Fields</label>
                         <div id="createFields">
                             <?php
                             $fields = $_POST['create_fields'] ?? [['name' => '', 'type' => 'TEXT', 'constraints' => '']];
                             foreach ($fields as $i => $f):
                             ?>
                             <div class="d-flex mb-2">
-                                <input name="create_fields[<?= $i ?>][name]" class="form-input me-2" placeholder="Nome campo" value="<?= htmlspecialchars($f['name']) ?>" required>
+                                <input name="create_fields[<?= $i ?>][name]" class="form-input me-2" placeholder="Field name" value="<?= htmlspecialchars($f['name']) ?>" required>
                                 <select name="create_fields[<?= $i ?>][type]" class="form-input me-2">
                                     <option value="TEXT" <?= $f['type'] === 'TEXT' ? 'selected' : '' ?>>TEXT</option>
                                     <option value="INTEGER" <?= $f['type'] === 'INTEGER' ? 'selected' : '' ?>>INTEGER</option>
                                     <option value="REAL" <?= $f['type'] === 'REAL' ? 'selected' : '' ?>>REAL</option>
                                     <option value="BLOB" <?= $f['type'] === 'BLOB' ? 'selected' : '' ?>>BLOB</option>
                                 </select>
-                                <input name="create_fields[<?= $i ?>][constraints]" class="form-input me-2" placeholder="Vincoli (PRIMARY KEY, NOT NULL, etc.)" value="<?= htmlspecialchars($f['constraints']) ?>">
+                                <input name="create_fields[<?= $i ?>][constraints]" class="form-input me-2" placeholder="Constraints (PRIMARY KEY, NOT NULL, etc.)" value="<?= htmlspecialchars($f['constraints']) ?>">
                                 <button type="button" class="btn btn-danger btn-sm" onclick="this.parentNode.remove()">&times;</button>
                             </div>
                             <?php endforeach; ?>
                         </div>
-                        <button type="button" class="btn btn-outline btn-sm" onclick="addCreateField()">+ Aggiungi campo</button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="addCreateField()">+ Add field</button>
                     </div>
                 <?php endif; ?>
                 
                 <?php if ($queryType === 'SELECT' && $table || $queryType !== 'SELECT'): ?>
                     <button type="submit" name="build_query" class="btn btn-primary">
                         <i class="fas fa-code"></i>
-                        Costruisci Query <?= $queryType ?>
+                        Build Query <?= $queryType ?>
                     </button>
                 <?php endif; ?>
             </form>
         </div>
     </div>
     
-    <!-- Editor SQL Manuale -->
+    <!-- Manual SQL Editor -->
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">
                 <i class="fas fa-terminal"></i>
-                Editor SQL Manuale
+                Manual SQL Editor
             </h3>
         </div>
         <div class="card-body">
@@ -2665,7 +2669,7 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
                 </div>
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-play"></i>
-                    Esegui Query
+                    Run Query
                 </button>
             </form>
         </div>
@@ -2673,7 +2677,7 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
     
     <?php if ($query_error): ?>
         <div class="alert alert-error">
-            <strong><i class="fas fa-exclamation-triangle"></i> Errore SQL:</strong><br>
+            <strong><i class="fas fa-exclamation-triangle"></i> SQL Error:</strong><br>
             <?= htmlspecialchars($query_error) ?>
         </div>
     <?php endif; ?>
@@ -2683,7 +2687,7 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
             <div class="card-header">
                 <h3 class="card-title">
                     <i class="fas fa-list"></i>
-                    Risultati
+                    Results
                 </h3>
             </div>
             <div class="card-body">
@@ -2715,12 +2719,12 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
                     </div>
                     <div class="mt-2 text-muted">
                         <i class="fas fa-info-circle"></i>
-                        <?= count($result) ?> risultati trovati
+                        <?= count($result) ?> results found
                     </div>
                 <?php else: ?>
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle"></i>
-                        Nessun risultato restituito dalla query.
+                        No results were returned from the query.
                     </div>
                 <?php endif; ?>
             </div>
@@ -2728,14 +2732,14 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
     <?php endif; ?>
     
     <script>
-        // Funzioni JavaScript per aggiungere campi dinamicamente
+        // JavaScript functions to add fields dynamically
         
-        // Aggiungi condizione WHERE per SELECT
+        // Add WHERE condition for SELECT
         function addCondition() {
             let cnt = document.querySelectorAll('#conditionsContainer .condition-row').length;
             let html = '<div class="condition-row">' +
                 '<select name="where[' + cnt + '][column]" class="form-input">' +
-                    '<option value="">Seleziona campo</option>' +
+                    '<option value="">Select field</option>' +
                     <?php foreach ($columns as $col): ?>
                         '"<option value="<?= htmlspecialchars($col) ?>"><?= htmlspecialchars($col) ?></option>" +' +
                     <?php endforeach; ?>
@@ -2749,8 +2753,8 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
                     '<option value=">=">Maggiore o uguale</option>' +
                     '<option value="LIKE">Contiene</option>' +
                 '</select>' +
-                '<input type="text" name="where[' + cnt + '][value]" class="form-input" placeholder="Valore">' +
-                '<button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Rimuovi Condizione">&times;</button>' +
+                '<input type="text" name="where[' + cnt + '][value]" class="form-input" placeholder="Value">' +
+                '<button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Remove Condition">&times;</button>' +
             '</div>';
             document.getElementById('conditionsContainer').insertAdjacentHTML('beforeend', html);
         }
@@ -2758,14 +2762,14 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
         // Aggiungi campo INSERT
         function addInsertField() {
             let html = '<div class="d-flex mb-2">' +
-                '<input name="insert_cols[]" class="form-input me-2" placeholder="Colonna">' +
-                '<input name="insert_vals[]" class="form-input" placeholder="Valore">' +
+                '<input name="insert_cols[]" class="form-input me-2" placeholder="Column">' +
+                '<input name="insert_vals[]" class="form-input" placeholder="Value">' +
                 '<button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentNode.remove()">&times;</button>' +
             '</div>';
             document.getElementById('insertCols').insertAdjacentHTML('beforeend', html);
         }
         
-        // Aggiungi campo UPDATE SET
+        // Add UPDATE SET field
         function addUpdateField() {
             let cnt = document.querySelectorAll('#updateSets > div').length;
             let html = '<div class="d-flex mb-2">' +
@@ -2775,18 +2779,18 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
                         '"<option value="<?= htmlspecialchars($col) ?>"><?= htmlspecialchars($col) ?></option>" +' +
                     <?php endforeach; endif; ?>
                 '</select>' +
-                '<input name="update_set[' + cnt + '][val]" class="form-input" placeholder="Nuovo valore">' +
+                '<input name="update_set[' + cnt + '][val]" class="form-input" placeholder="New value">' +
                 '<button type="button" class="btn btn-danger btn-sm ms-2" onclick="this.parentNode.remove()">&times;</button>' +
             '</div>';
             document.getElementById('updateSets').insertAdjacentHTML('beforeend', html);
         }
         
-        // Aggiungi condizione WHERE per UPDATE
+        // Add WHERE condition for UPDATE
         function addUpdateCondition() {
             let cnt = document.querySelectorAll('#updateConditionsContainer .condition-row').length;
             let html = '<div class="condition-row">' +
                 '<select name="where[' + cnt + '][column]" class="form-input">' +
-                    '<option value="">Seleziona campo</option>' +
+                    '<option value="">Select field</option>' +
                     <?php if (isset($updateColumns)): foreach ($updateColumns as $col): ?>
                         '"<option value="<?= htmlspecialchars($col) ?>"><?= htmlspecialchars($col) ?></option>" +' +
                     <?php endforeach; endif; ?>
@@ -2801,17 +2805,17 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
                     '<option value="LIKE">Contiene</option>' +
                 '</select>' +
                 '<input type="text" name="where[' + cnt + '][value]" class="form-input" placeholder="Valore">' +
-                '<button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Rimuovi Condizione">&times;</button>' +
+                '<button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Remove Condition">&times;</button>' +
             '</div>';
             document.getElementById('updateConditionsContainer').insertAdjacentHTML('beforeend', html);
         }
         
-        // Aggiungi condizione WHERE per DELETE
+        // Add WHERE condition for DELETE
         function addDeleteCondition() {
             let cnt = document.querySelectorAll('#deleteConditionsContainer .condition-row').length;
             let html = '<div class="condition-row">' +
                 '<select name="where[' + cnt + '][column]" class="form-input">' +
-                    '<option value="">Seleziona campo</option>' +
+                    '<option value="">Select field</option>' +
                     <?php if (isset($deleteColumns)): foreach ($deleteColumns as $col): ?>
                         '"<option value="<?= htmlspecialchars($col) ?>"><?= htmlspecialchars($col) ?></option>" +' +
                     <?php endforeach; endif; ?>
@@ -2826,29 +2830,29 @@ CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
                     '<option value="LIKE">Contiene</option>' +
                 '</select>' +
                 '<input type="text" name="where[' + cnt + '][value]" class="form-input" placeholder="Valore">' +
-                '<button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Rimuovi Condizione">&times;</button>' +
+                '<button type="button" class="btn btn-danger btn-sm btn-remove-condition" title="Remove Condition">&times;</button>' +
             '</div>';
             document.getElementById('deleteConditionsContainer').insertAdjacentHTML('beforeend', html);
         }
         
-        // Aggiungi campo CREATE TABLE
+        // Add CREATE TABLE field
         function addCreateField() {
             let cnt = document.querySelectorAll('#createFields > div').length;
             let html = '<div class="d-flex mb-2">' +
-                '<input name="create_fields[' + cnt + '][name]" class="form-input me-2" placeholder="Nome campo" required>' +
+                '<input name="create_fields[' + cnt + '][name]" class="form-input me-2" placeholder="Field name" required>' +
                 '<select name="create_fields[' + cnt + '][type]" class="form-input me-2">' +
                     '<option value="TEXT">TEXT</option>' +
                     '<option value="INTEGER">INTEGER</option>' +
                     '<option value="REAL">REAL</option>' +
                     '<option value="BLOB">BLOB</option>' +
                 '</select>' +
-                '<input name="create_fields[' + cnt + '][constraints]" class="form-input me-2" placeholder="Vincoli (PRIMARY KEY, NOT NULL, etc.)">' +
+                '<input name="create_fields[' + cnt + '][constraints]" class="form-input me-2" placeholder="Constraints (PRIMARY KEY, NOT NULL, etc.)">' +
                 '<button type="button" class="btn btn-danger btn-sm" onclick="this.parentNode.remove()">&times;</button>' +
             '</div>';
             document.getElementById('createFields').insertAdjacentHTML('beforeend', html);
         }
         
-        // Rimozione condizioni WHERE
+        // Removing WHERE conditions
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('btn-remove-condition')) {
                 e.target.parentNode.remove();
@@ -2866,10 +2870,10 @@ function include_page_info() {
     <div class="page-header">
         <h1 class="page-title">
             <i class="fas fa-info-circle"></i>
-            Informazioni Database
+            Database Information
         </h1>
         <p class="page-subtitle">
-            Dettagli tecnici e statistiche per <?= htmlspecialchars($dbfile) ?>
+            Technical details and statistics for <?= htmlspecialchars($dbfile) ?>
         </p>
     </div>
 
@@ -2886,35 +2890,35 @@ function include_page_info() {
                     <table class="table">
                         <tbody>
                             <tr>
-                                <td><strong>Nome Database</strong></td>
+                                <td><strong>Database Name</strong></td>
                                 <td><?= htmlspecialchars($info['db_name']) ?></td>
                             </tr>
                             <tr>
-                                <td><strong>Percorso Completo</strong></td>
+                                <td><strong>Complete route</strong></td>
                                 <td><code><?= htmlspecialchars($info['path']) ?></code></td>
                             </tr>
                             <tr>
-                                <td><strong>Dimensione File</strong></td>
+                                <td><strong>File Size</strong></td>
                                 <td><?= htmlspecialchars($info['size']) ?></td>
                             </tr>
                             <tr>
-                                <td><strong>Ultima Modifica</strong></td>
+                                <td><strong>Last Edit</strong></td>
                                 <td><?= htmlspecialchars($info['last_modified']) ?></td>
                             </tr>
                             <tr>
-                                <td><strong>Versione SQLite</strong></td>
+                                <td><strong>SQLite Version</strong></td>
                                 <td><?= htmlspecialchars($info['sqlite_version']) ?></td>
                             </tr>
                             <tr>
-                                <td><strong>Estensione PHP</strong></td>
+                                <td><strong>PHP Extension</strong></td>
                                 <td><?= htmlspecialchars($info['sqlite_extension']) ?></td>
                             </tr>
                             <tr>
-                                <td><strong>Versione PHP</strong></td>
+                                <td><strong>PHP Version</strong></td>
                                 <td><?= htmlspecialchars($info['php_version']) ?></td>
                             </tr>
                             <tr>
-                                <td><strong>Versione Programma</strong></td>
+                                <td><strong>Program Version</strong></td>
                                 <td><?= htmlspecialchars($info['program_version']) ?></td>
                             </tr>
                         </tbody>
@@ -2928,7 +2932,7 @@ function include_page_info() {
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-cog"></i>
-                        Configurazione SQLite
+                        SQLite configuration
                     </h3>
                 </div>
                 <div class="card-body">
@@ -2951,8 +2955,8 @@ function include_page_info() {
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>Configurazione</th>
-                                        <th>Valore</th>
+                                        <th>Configuration</th>
+                                        <th>Value</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2968,7 +2972,7 @@ function include_page_info() {
                     <?php else: ?>
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle"></i>
-                            Impossibile recuperare le informazioni di configurazione.
+                            Unable to retrieve configuration information.
                         </div>
                     <?php endif; ?>
                 </div>
@@ -2977,7 +2981,7 @@ function include_page_info() {
     <?php else: ?>
         <div class="alert alert-error">
             <i class="fas fa-exclamation-triangle"></i>
-            Database non trovato o inaccessibile.
+            Database not found or inaccessible.
         </div>
     <?php endif; ?>
     <?php
@@ -2988,7 +2992,7 @@ function include_page_browse() {
 
     $table = $_GET['table'] ?? '';
     if (!$table || !$pdo) {
-        echo '<div class="alert alert-error">Tabella non specificata o database non disponibile.</div>';
+        echo '<div class="alert alert-error">Table not specified or database not available.</div>';
         return;
     }
 
@@ -2996,7 +3000,7 @@ function include_page_browse() {
         // Recupera metadati della tabella
         $table_info = $pdo->query("PRAGMA table_info(`$table`)")->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
-        echo '<div class="alert alert-error">Errore: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        echo '<div class="alert alert-error">Error: ' . htmlspecialchars($e->getMessage()) . '</div>';
         return;
     }
     ?>
@@ -3007,7 +3011,7 @@ function include_page_browse() {
             Browse: <?= htmlspecialchars($table) ?>
         </h1>
         <p class="page-subtitle">
-            Visualizzazione e modifica dati della tabella
+            Viewing and editing table data
         </p>
     </div>
 
@@ -3018,12 +3022,12 @@ function include_page_browse() {
         </div>
     <?php endif; ?>
 
-    <!-- Form per inserimento nuovo record -->
+    <!-- Form for inserting a new record -->
     <div class="card mb-3">
         <div class="card-header">
             <h3 class="card-title">
                 <i class="fas fa-plus"></i>
-                Aggiungi Nuovo Record
+                Add New Record
             </h3>
         </div>
         <div class="card-body">
@@ -3047,7 +3051,7 @@ function include_page_browse() {
                 </div>
                 <button type="submit" name="insert_record" class="btn btn-success">
                     <i class="fas fa-plus"></i>
-                    Aggiungi record
+                    Add Record
                 </button>
             </form>
         </div>
@@ -3057,15 +3061,15 @@ function include_page_browse() {
         <div class="card">
             <div class="card-body text-center">
                 <i class="fas fa-inbox" style="font-size: 3rem; color: var(--secondary); margin-bottom: 1rem;"></i>
-                <h3>Tabella Vuota</h3>
-                <p class="text-muted">Questa tabella non contiene ancora dati.</p>
+                <h3>Empty Table</h3>
+                <p class="text-muted">This table does not yet contain data.</p>
             </div>
         </div>
     <?php else: ?>
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">
-                    Dati Tabella
+                    Data Table
                     <span class="nav-badge"><?= count($browse_data) ?> record</span>
                 </h3>
             </div>
@@ -3082,7 +3086,7 @@ function include_page_browse() {
                                     ?>
                                         <th><?= htmlspecialchars($colname) ?></th>
                                     <?php endforeach; ?>
-                                    <th>Azioni</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3098,9 +3102,9 @@ function include_page_browse() {
                                                     echo '<td>';
                                                     if (!is_null($row[$colname]) && @getimagesizefromstring($row[$colname])) {
                                                         echo '<img src="data:image/*;base64,'.base64_encode($row[$colname]).'" class="blob-preview"><br>';
-                                                        echo '<a href="?db='.urlencode($dbfile).'&page=browse&table='.urlencode($table).'&download_blob=1&rowid='.intval($row["rowid"]).'&col='.urlencode($colname).'">Scarica</a><br>';
+                                                        echo '<a href="?db='.urlencode($dbfile).'&page=browse&table='.urlencode($table).'&download_blob=1&rowid='.intval($row["rowid"]).'&col='.urlencode($colname).'">Download</a><br>';
                                                     } elseif (!is_null($row[$colname])) {
-                                                        echo '<a href="?db='.urlencode($dbfile).'&page=browse&table='.urlencode($table).'&download_blob=1&rowid='.intval($row["rowid"]).'&col='.urlencode($colname).'">Scarica file</a><br>';
+                                                        echo '<a href="?db='.urlencode($dbfile).'&page=browse&table='.urlencode($table).'&download_blob=1&rowid='.intval($row["rowid"]).'&col='.urlencode($colname).'">Download file</a><br>';
                                                     }
                                                     echo '<input type="file" name="new_'.htmlspecialchars($colname).'[]">';
                                                     echo '</td>';
@@ -3113,7 +3117,7 @@ function include_page_browse() {
                                                class="btn btn-danger btn-sm" 
                                                onclick="return confirm('Eliminare record?')">
                                                 <i class="fas fa-trash"></i>
-                                                Elimina
+                                                Delete
                                             </a>
                                         </td>
                                     </tr>
@@ -3124,14 +3128,14 @@ function include_page_browse() {
                     <input type="hidden" name="cols" value="<?= htmlspecialchars(json_encode($cols_for_edit)) ?>">
                     <button type="submit" class="btn btn-primary mt-3">
                         <i class="fas fa-save"></i>
-                        Salva modifiche
+                        Save changes
                     </button>
                 </form>
             </div>
         </div>
         <div class="text-muted mt-2">
             <i class="fas fa-info-circle"></i>
-            Visualizzati primi 100 record. Per visualizzare più record, utilizza una query SQL personalizzata.
+            The first 100 records are displayed. To display more records, use a custom SQL query.
         </div>
     <?php endif; ?>
     <?php
@@ -3142,24 +3146,24 @@ function include_page_structure() {
 
     $table = $_GET['table'] ?? '';
     if (!$table || !$pdo) {
-        echo '<div class="alert alert-error">Tabella non specificata o database non disponibile.</div>';
+        echo '<div class="alert alert-error">Table not specified or database not available.</div>';
         return;
     }
 
     try {
         $cols = $pdo->query("PRAGMA table_info('$table')")->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
-        echo '<div class="alert alert-error">Errore: ' . htmlspecialchars($e->getMessage()) . '</div>';
+        echo '<div class="alert alert-error">Error: ' . htmlspecialchars($e->getMessage()) . '</div>';
         return;
     }
     ?>
     <div class="page-header">
         <h1 class="page-title">
             <i class="fas fa-cogs"></i>
-            Struttura: <?= htmlspecialchars($table) ?>
+            Structure: <?= htmlspecialchars($table) ?>
         </h1>
         <p class="page-subtitle">
-            Modifica struttura della tabella
+            Change table structure
         </p>
     </div>
 
@@ -3174,7 +3178,7 @@ function include_page_structure() {
         <div class="card-header">
             <h3 class="card-title">
                 <i class="fas fa-columns"></i>
-                Colonne (<?= count($cols) ?>)
+                Columns (<?= count($cols) ?>)
             </h3>
         </div>
         <div class="card-body">
@@ -3183,14 +3187,14 @@ function include_page_structure() {
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Nome colonna (modifica)</th>
-                                <th>Tipo</th>
+                                <th>Column name (edit)</th>
+                                <th>Type</th>
                                 <th>PK</th>
                                 <th>AI</th>
                                 <th>Not Null</th>
                                 <th>Unique</th>
                                 <th>Default</th>
-                                <th>Elimina</th>
+                                <th>Delete</th>
                             </tr>
                         </thead>
                         <tbody id="cols-body">
@@ -3218,11 +3222,11 @@ function include_page_structure() {
                 </div>
                 <button type="button" class="btn btn-outline mb-2" onclick="addColumnRow()">
                     <i class="fas fa-plus"></i>
-                    Aggiungi colonna
+                    Add column
                 </button>
                 <button type="submit" name="save_structure" class="btn btn-success mb-2">
                     <i class="fas fa-save"></i>
-                    Salva modifiche
+                    Save changes
                 </button>
             </form>
         </div>
@@ -3235,7 +3239,7 @@ function include_page_truncate() {
 
     $table = $_GET['table'] ?? '';
     if (!$table || !$pdo) {
-        echo '<div class="alert alert-error">Tabella non specificata o database non disponibile.</div>';
+        echo '<div class="alert alert-error">Table not specified or database not available.</div>';
         return;
     }
 
@@ -3249,10 +3253,10 @@ function include_page_truncate() {
     <div class="page-header">
         <h1 class="page-title">
             <i class="fas fa-trash"></i>
-            Svuota Tabella: <?= htmlspecialchars($table) ?>
+            Empty Table: <?= htmlspecialchars($table) ?>
         </h1>
         <p class="page-subtitle">
-            Rimuovi tutti i dati dalla tabella
+            Remove all data from the table
         </p>
     </div>
 
@@ -3260,15 +3264,15 @@ function include_page_truncate() {
         <div class="card-header">
             <h3 class="card-title">
                 <i class="fas fa-exclamation-triangle text-danger"></i>
-                Conferma Operazione
+                Confirm Operation
             </h3>
         </div>
         <div class="card-body">
             <div class="alert alert-warning">
-                <strong><i class="fas fa-warning"></i> Attenzione!</strong><br>
-                Questa operazione rimuoverà <strong>tutti i <?= number_format($count) ?> record</strong> 
-                dalla tabella <code><?= htmlspecialchars($table) ?></code>.<br>
-                <strong>L'operazione non è reversibile!</strong>
+                <strong><i class="fas fa-warning"></i> Attention!</strong><br>
+                This operation will remove <strong>all the <?= number_format($count) ?> record</strong> 
+                from the table <code><?= htmlspecialchars($table) ?></code>.<br>
+                <strong>The operation is not reversible!</strong>
             </div>
 
             <?php if ($count > 0): ?>
@@ -3276,30 +3280,30 @@ function include_page_truncate() {
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" name="vacuum_after" id="vacuum_after" value="1">
                         <label class="form-check-label" for="vacuum_after">
-                            Esegui VACUUM dopo lo svuotamento
+                            Run VACUUM after emptying
                         </label>
                     </div>
                     <div class="flex gap-2">
                         <button type="submit" name="confirm_truncate" class="btn btn-danger">
                             <i class="fas fa-trash"></i>
-                            Conferma - Svuota Tabella
+                            Confirm - Empty Table
                         </button>
                         <a href="?db=<?= urlencode($dbfile) ?>&page=browse&table=<?= urlencode($table) ?>" 
                            class="btn btn-secondary">
                             <i class="fas fa-times"></i>
-                            Annulla
+                            Cancel
                         </a>
                     </div>
                 </form>
             <?php else: ?>
                 <div class="alert alert-info">
                     <i class="fas fa-info-circle"></i>
-                    La tabella è già vuota.
+                    The table is already empty.
                 </div>
                 <a href="?db=<?= urlencode($dbfile) ?>&page=browse&table=<?= urlencode($table) ?>" 
                    class="btn btn-primary">
                     <i class="fas fa-arrow-left"></i>
-                    Torna alla Tabella
+                    Return to the Table
                 </a>
             <?php endif; ?>
         </div>
