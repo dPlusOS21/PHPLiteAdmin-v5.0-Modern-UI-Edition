@@ -354,54 +354,79 @@ if (isset($_GET['download_blob']) && $pdo && isset($_GET['table']) && isset($_GE
 if ($pdo && $page === 'crea_tabella' && isset($_POST['newtable']) && $_POST['newtable'] && is_logged_in()) {
     $tablename = preg_replace("/[^a-zA-Z0-9_]/", "", $_POST['newtable']);
     $fields_sql = [];
-    for($i=0; $i<count($_POST['col']); $i++) {
-        $name = preg_replace("/[^a-zA-Z0-9_]/", "", $_POST['col'][$i]);
-        if (!$name) continue;
-        $type = $_POST['type'][$i];
-        $sql = "`$name` $type";
-        if (!empty($_POST['pk'][$i])) $sql .= " PRIMARY KEY";
-        if (!empty($_POST['ai'][$i]) && $type == 'INTEGER' && !empty($_POST['pk'][$i])) $sql .= " AUTOINCREMENT";
-        if (!empty($_POST['nn'][$i])) $sql .= " NOT NULL";
-        if (!empty($_POST['unique'][$i])) $sql .= " UNIQUE";
-        if (isset($_POST['default'][$i]) && $_POST['default'][$i] !== '') $sql .= " DEFAULT '".addslashes($_POST['default'][$i])."'";
-        $fields_sql[] = $sql;
+    
+    // Verifica che esistano i campi necessari
+    if (isset($_POST['col']) && is_array($_POST['col'])) {
+        for($i=0; $i<count($_POST['col']); $i++) {
+            $name = preg_replace("/[^a-zA-Z0-9_]/", "", $_POST['col'][$i]);
+            if (!$name) continue;
+            
+            $type = $_POST['type'][$i] ?? 'TEXT';
+            $sql = "`$name` $type";
+            
+            // Usa isset() per verificare l'esistenza dei checkbox
+            if (isset($_POST['pk'][$i]) && $_POST['pk'][$i] == '1') $sql .= " PRIMARY KEY";
+            if (isset($_POST['ai'][$i]) && $_POST['ai'][$i] == '1' && $type == 'INTEGER' && isset($_POST['pk'][$i]) && $_POST['pk'][$i] == '1') $sql .= " AUTOINCREMENT";
+            if (isset($_POST['nn'][$i]) && $_POST['nn'][$i] == '1') $sql .= " NOT NULL";
+            if (isset($_POST['unique'][$i]) && $_POST['unique'][$i] == '1') $sql .= " UNIQUE";
+            if (isset($_POST['default'][$i]) && $_POST['default'][$i] !== '') $sql .= " DEFAULT '".addslashes($_POST['default'][$i])."'";
+            
+            $fields_sql[] = $sql;
+        }
     }
+    
     if (count($fields_sql) > 0) {
-        $create_sql = "CREATE TABLE `$tablename` (" . implode(",",$fields_sql) . ");";
-        $pdo->query($create_sql);
+        try {
+            $create_sql = "CREATE TABLE `$tablename` (" . implode(",",$fields_sql) . ");";
+            $pdo->exec($create_sql);
+            header("Location: ?db=$dbfile&page=tabelle"); 
+            exit;
+        } catch (Exception $e) {
+            $error = "Error creating table: " . $e->getMessage();
+        }
+    } else {
+        $error = "At least one column is required";
     }
-    header("Location: ?db=$dbfile&page=tabelle"); exit;
 }
 
 // Edit table structure
 if ($pdo && $page === 'structure' && isset($_GET['table']) && is_logged_in()) {
     $table = $_GET['table'];
     $error_structure = "";
+    
     if (isset($_POST['save_structure'])) {
         $old_cols = $pdo->query("PRAGMA table_info('$table')")->fetchAll(PDO::FETCH_ASSOC);
         $old_col_names = array_column($old_cols, 'name');
         $new_cols = [];
-        for ($i=0; $i<count($_POST['col_oldname']); $i++) {
-    // ADD THIS LINE:
-    if (isset($_POST['delcol']) && in_array($i, $_POST['delcol'])) {
-        continue; // Skip this column if it is marked for deletion
-    }
-            $colname = trim($_POST['col_newname'][$i]);
-            if ($colname === '') continue;
-            $colname = preg_replace("/[^a-zA-Z0-9_]/", "", $colname);
-            $coltype = $_POST['col_type'][$i];
-            $sql = "`$colname` $coltype";
-            if (!empty($_POST['pk'][$i])) $sql .= " PRIMARY KEY";
-            if (!empty($_POST['ai'][$i]) && $coltype == 'INTEGER' && !empty($_POST['pk'][$i])) $sql .= " AUTOINCREMENT";
-            if (!empty($_POST['nn'][$i])) $sql .= " NOT NULL";
-            if (!empty($_POST['unique'][$i])) $sql .= " UNIQUE";
-            if (isset($_POST['default'][$i]) && $_POST['default'][$i] !== '') $sql .= " DEFAULT '".addslashes($_POST['default'][$i])."'";
-            $new_cols[] = [
-                'sql' => $sql,
-                'name' => $colname,
-                'oldname' => $_POST['col_oldname'][$i]
-            ];
+        
+        if (isset($_POST['col_oldname']) && is_array($_POST['col_oldname'])) {
+            for ($i=0; $i<count($_POST['col_oldname']); $i++) {
+                // Skip deleted columns
+                if (isset($_POST['delcol']) && in_array($i, $_POST['delcol'])) {
+                    continue;
+                }
+                
+                $colname = trim($_POST['col_newname'][$i] ?? '');
+                if ($colname === '') continue;
+                $colname = preg_replace("/[^a-zA-Z0-9_]/", "", $colname);
+                $coltype = $_POST['col_type'][$i] ?? 'TEXT';
+                $sql = "`$colname` $coltype";
+                
+                // Usa isset() per tutti i checkbox
+                if (isset($_POST['pk'][$i]) && $_POST['pk'][$i] == '1') $sql .= " PRIMARY KEY";
+                if (isset($_POST['ai'][$i]) && $_POST['ai'][$i] == '1' && $coltype == 'INTEGER' && isset($_POST['pk'][$i]) && $_POST['pk'][$i] == '1') $sql .= " AUTOINCREMENT";
+                if (isset($_POST['nn'][$i]) && $_POST['nn'][$i] == '1') $sql .= " NOT NULL";
+                if (isset($_POST['unique'][$i]) && $_POST['unique'][$i] == '1') $sql .= " UNIQUE";
+                if (isset($_POST['default'][$i]) && $_POST['default'][$i] !== '') $sql .= " DEFAULT '".addslashes($_POST['default'][$i])."'";
+                
+                $new_cols[] = [
+                    'sql' => $sql,
+                    'name' => $colname,
+                    'oldname' => $_POST['col_oldname'][$i]
+                ];
+            }
         }
+        
         if (count($new_cols) < 1) {
             $error_structure = "At least one column is needed to create the table.";
         } else {
@@ -409,21 +434,29 @@ if ($pdo && $page === 'structure' && isset($_GET['table']) && is_logged_in()) {
                 $pdo->beginTransaction();
                 $tmp_table = $table."_old_".time();
                 $pdo->exec("ALTER TABLE `$table` RENAME TO `$tmp_table`;");
+                
                 $cols_sql = array_column($new_cols, 'sql');
                 $create_sql = "CREATE TABLE `$table` (" . implode(", ", $cols_sql) . ");";
                 $pdo->exec($create_sql);
+                
                 $copy_cols_names = [];
                 foreach ($new_cols as $nc) {
                     if (in_array($nc['oldname'], $old_col_names)) {
                         $copy_cols_names[] = "`" . $nc['oldname'] . "`";
                     }
                 }
+                
                 if (count($copy_cols_names) > 0) {
                     $cols_list = implode(", ", $copy_cols_names);
                     $pdo->exec("INSERT INTO `$table` ($cols_list) SELECT $cols_list FROM `$tmp_table`;");
                 }
+                
                 $pdo->exec("DROP TABLE `$tmp_table`;");
                 $pdo->commit();
+                
+                header("Location: ?db=".urlencode($dbfile)."&page=structure&table=".urlencode($table));
+                exit;
+                
             } catch (Exception $e) {
                 $pdo->rollBack();
                 $error_structure = "Error while editing structure: " . $e->getMessage();
@@ -2081,11 +2114,11 @@ function include_page_crea_tabella() {
                                 <th>Default</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <?php for($i=0; $i<5; $i++): ?>
+                        <tbody id="cols-body-crea">
+                            <?php for($i=0; $i<3; $i++): ?>
                             <tr>
                                 <td>
-                                    <input type="text" name="col[]" class="form-input" placeholder="Nome colonna">
+                                    <input type="text" name="col[]" class="form-input" placeholder="Column name" required>
                                 </td>
                                 <td>
                                     <select name="type[]" class="form-input">
@@ -2093,25 +2126,30 @@ function include_page_crea_tabella() {
                                     </select>
                                 </td>
                                 <td class="text-center">
-                                    <input type="checkbox" name="pk[<?=$i?>]" value="1">
+                                    <input type="checkbox" name="pk[]" value="1">
                                 </td>
                                 <td class="text-center">
-                                    <input type="checkbox" name="ai[<?=$i?>]" value="1">
+                                    <input type="checkbox" name="ai[]" value="1">
                                 </td>
                                 <td class="text-center">
-                                    <input type="checkbox" name="nn[<?=$i?>]" value="1">
+                                    <input type="checkbox" name="nn[]" value="1">
                                 </td>
                                 <td class="text-center">
-                                    <input type="checkbox" name="unique[<?=$i?>]" value="1">
+                                    <input type="checkbox" name="unique[]" value="1">
                                 </td>
                                 <td>
-                                    <input type="text" name="default[]" class="form-input" placeholder="Valore default">
+                                    <input type="text" name="default[]" class="form-input" placeholder="Default value">
                                 </td>
                             </tr>
                             <?php endfor; ?>
                         </tbody>
                     </table>
                 </div>
+
+                <button type="button" class="btn btn-outline mb-2" onclick="addColumnRowCrea()">
+                    <i class="fas fa-plus"></i>
+                    Add Column
+                </button>
 
                 <button type="submit" class="btn btn-success">
                     <i class="fas fa-plus"></i>
@@ -2120,6 +2158,31 @@ function include_page_crea_tabella() {
             </form>
         </div>
     </div>
+
+    <script>
+    function addColumnRowCrea() {
+        const tbody = document.getElementById('cols-body-crea');
+        const i = tbody.rows.length;
+        const types = ['INTEGER','TEXT','REAL','BLOB','NUMERIC','BOOLEAN','DATETIME'];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <input type="text" name="col[]" class="form-input" placeholder="Column name" required>
+            </td>
+            <td>
+                <select name="type[]" class="form-input">
+                    ${types.map(t => `<option value="${t}">${t}</option>`).join('')}
+                </select>
+            </td>
+            <td class="text-center"><input type="checkbox" name="pk[]" value="1"></td>
+            <td class="text-center"><input type="checkbox" name="ai[]" value="1"></td>
+            <td class="text-center"><input type="checkbox" name="nn[]" value="1"></td>
+            <td class="text-center"><input type="checkbox" name="unique[]" value="1"></td>
+            <td><input type="text" name="default[]" class="form-input" placeholder="Default value"></td>
+        `;
+        tbody.appendChild(tr);
+    }
+    </script>
     <?php
 }
 
@@ -3316,4 +3379,47 @@ function include_page_truncate() {
 document.querySelectorAll('.alert').forEach(function(alert) {
   if(alert.textContent.trim() === '') { alert.style.display = 'none'; }
 });
+
+// Fix per i form dinamici
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestione rimozione condizioni query builder
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-remove-condition')) {
+            e.target.closest('.condition-row').remove();
+        }
+    });
+    
+    // Fix per i checkbox nei form dinamici
+    document.addEventListener('change', function(e) {
+        if (e.target.type === 'checkbox') {
+            // Assicurati che i checkbox siano gestiti correttamente
+            e.target.value = e.target.checked ? '1' : '0';
+        }
+    });
+});
+
+// Funzione per aggiungere righe nella query builder
+function addCondition() {
+    const container = document.getElementById('conditionsContainer');
+    const index = container.children.length;
+    const div = document.createElement('div');
+    div.className = 'condition-row';
+    div.innerHTML = `
+        <select name="where[${index}][column]" class="form-input">
+            <option value="">Select field</option>
+        </select>
+        <select name="where[${index}][operator]" class="form-input">
+            <option value="=">equal</option>
+            <option value="!=">Different</option>
+            <option value="<">Minor</option>
+            <option value="<=">Less than or equal</option>
+            <option value=">">Greater</option>
+            <option value=">=">Greater than or equal</option>
+            <option value="LIKE">Contains</option>
+        </select>
+        <input type="text" name="where[${index}][value]" class="form-input" placeholder="Value">
+        <button type="button" class="btn btn-danger btn-sm btn-remove-condition">&times;</button>
+    `;
+    container.appendChild(div);
+}
 </script>
