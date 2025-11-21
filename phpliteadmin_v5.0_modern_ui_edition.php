@@ -95,7 +95,6 @@ function type_options_html($selected = "") {
     return $html;
 }
 
-
 // Function to empty a specified table
 function dropTableData($table, $pdo) {
     $table = preg_replace('/[^a-zA-Z0-9_]/', '', $table); // Simple table name sanitization
@@ -106,6 +105,120 @@ function dropTableData($table, $pdo) {
     $pdo->exec("DELETE FROM \"$table\""); 
 }
 
+// Function to get database structure
+function get_database_structure($pdo) {
+    if (!$pdo) return null;
+    
+    $structure = [
+        'tables' => [],
+        'indexes' => [],
+        'triggers' => [],
+        'views' => []
+    ];
+    
+    try {
+        // Get all tables
+        $tables = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($tables as $table) {
+            $table_name = $table['name'];
+            
+            // Get table structure
+            $columns = $pdo->query("PRAGMA table_info(`$table_name`)")->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Get indexes for this table
+            $indexes = $pdo->query("SELECT * FROM sqlite_master WHERE type='index' AND tbl_name='$table_name'")->fetchAll(PDO::FETCH_ASSOC);
+            
+            $structure['tables'][$table_name] = [
+                'sql' => $table['sql'],
+                'columns' => $columns,
+                'indexes' => $indexes
+            ];
+        }
+        
+        // Get views
+        $structure['views'] = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='view'")->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Get triggers
+        $structure['triggers'] = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='trigger'")->fetchAll(PDO::FETCH_ASSOC);
+        
+    } catch (Exception $e) {
+        return null;
+    }
+    
+    return $structure;
+}
+
+// Function to generate printable structure
+function generate_print_structure($structure, $database_name) {
+    $html = '<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Structure: ' . htmlspecialchars($database_name) . '</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .table-structure { margin-bottom: 30px; border: 1px solid #ccc; padding: 15px; }
+            .table-name { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+            .column { margin-left: 20px; margin-bottom: 5px; }
+            .index { margin-left: 20px; color: #666; font-style: italic; }
+            @media print {
+                .no-print { display: none; }
+                body { margin: 10px; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="no-print">
+            <button onclick="window.print()">Print</button>
+            <button onclick="window.close()">Close</button>
+            <hr>
+        </div>
+        <h1>Database Structure: ' . htmlspecialchars($database_name) . '</h1>';
+    
+    foreach ($structure['tables'] as $table_name => $table_data) {
+        $html .= '<div class="table-structure">
+            <div class="table-name">Table: ' . htmlspecialchars($table_name) . '</div>
+            <div class="sql">SQL: <code>' . htmlspecialchars($table_data['sql']) . '</code></div>
+            <div class="columns">';
+        
+        foreach ($table_data['columns'] as $column) {
+            $html .= '<div class="column">' . htmlspecialchars($column['name']) . ' ' . 
+                    htmlspecialchars($column['type']) . 
+                    ($column['pk'] ? ' PRIMARY KEY' : '') . 
+                    ($column['notnull'] ? ' NOT NULL' : '') . 
+                    ($column['dflt_value'] ? ' DEFAULT ' . htmlspecialchars($column['dflt_value']) : '') . '</div>';
+        }
+        
+        foreach ($table_data['indexes'] as $index) {
+            $html .= '<div class="index">Index: ' . htmlspecialchars($index['name']) . ' (' . htmlspecialchars($index['sql']) . ')</div>';
+        }
+        
+        $html .= '</div></div>';
+    }
+    
+    if (!empty($structure['views'])) {
+        $html .= '<h2>Views</h2>';
+        foreach ($structure['views'] as $view) {
+            $html .= '<div class="table-structure">
+                <div class="table-name">View: ' . htmlspecialchars($view['name']) . '</div>
+                <div class="sql">' . htmlspecialchars($view['sql']) . '</div>
+            </div>';
+        }
+    }
+    
+    if (!empty($structure['triggers'])) {
+        $html .= '<h2>Triggers</h2>';
+        foreach ($structure['triggers'] as $trigger) {
+            $html .= '<div class="table-structure">
+                <div class="table-name">Trigger: ' . htmlspecialchars($trigger['name']) . '</div>
+                <div class="sql">' . htmlspecialchars($trigger['sql']) . '</div>
+            </div>';
+        }
+    }
+    
+    $html .= '</body></html>';
+    return $html;
+}
 
 // ============ REQUEST MANAGEMENT ============
 $page = $_GET['page'] ?? 'dashboard';
@@ -354,79 +467,54 @@ if (isset($_GET['download_blob']) && $pdo && isset($_GET['table']) && isset($_GE
 if ($pdo && $page === 'crea_tabella' && isset($_POST['newtable']) && $_POST['newtable'] && is_logged_in()) {
     $tablename = preg_replace("/[^a-zA-Z0-9_]/", "", $_POST['newtable']);
     $fields_sql = [];
-    
-    // Verifica che esistano i campi necessari
-    if (isset($_POST['col']) && is_array($_POST['col'])) {
-        for($i=0; $i<count($_POST['col']); $i++) {
-            $name = preg_replace("/[^a-zA-Z0-9_]/", "", $_POST['col'][$i]);
-            if (!$name) continue;
-            
-            $type = $_POST['type'][$i] ?? 'TEXT';
-            $sql = "`$name` $type";
-            
-            // Usa isset() per verificare l'esistenza dei checkbox
-            if (isset($_POST['pk'][$i]) && $_POST['pk'][$i] == '1') $sql .= " PRIMARY KEY";
-            if (isset($_POST['ai'][$i]) && $_POST['ai'][$i] == '1' && $type == 'INTEGER' && isset($_POST['pk'][$i]) && $_POST['pk'][$i] == '1') $sql .= " AUTOINCREMENT";
-            if (isset($_POST['nn'][$i]) && $_POST['nn'][$i] == '1') $sql .= " NOT NULL";
-            if (isset($_POST['unique'][$i]) && $_POST['unique'][$i] == '1') $sql .= " UNIQUE";
-            if (isset($_POST['default'][$i]) && $_POST['default'][$i] !== '') $sql .= " DEFAULT '".addslashes($_POST['default'][$i])."'";
-            
-            $fields_sql[] = $sql;
-        }
+    for($i=0; $i<count($_POST['col']); $i++) {
+        $name = preg_replace("/[^a-zA-Z0-9_]/", "", $_POST['col'][$i]);
+        if (!$name) continue;
+        $type = $_POST['type'][$i];
+        $sql = "`$name` $type";
+        if (!empty($_POST['pk'][$i])) $sql .= " PRIMARY KEY";
+        if (!empty($_POST['ai'][$i]) && $type == 'INTEGER' && !empty($_POST['pk'][$i])) $sql .= " AUTOINCREMENT";
+        if (!empty($_POST['nn'][$i])) $sql .= " NOT NULL";
+        if (!empty($_POST['unique'][$i])) $sql .= " UNIQUE";
+        if (isset($_POST['default'][$i]) && $_POST['default'][$i] !== '') $sql .= " DEFAULT '".addslashes($_POST['default'][$i])."'";
+        $fields_sql[] = $sql;
     }
-    
     if (count($fields_sql) > 0) {
-        try {
-            $create_sql = "CREATE TABLE `$tablename` (" . implode(",",$fields_sql) . ");";
-            $pdo->exec($create_sql);
-            header("Location: ?db=$dbfile&page=tabelle"); 
-            exit;
-        } catch (Exception $e) {
-            $error = "Error creating table: " . $e->getMessage();
-        }
-    } else {
-        $error = "At least one column is required";
+        $create_sql = "CREATE TABLE `$tablename` (" . implode(",",$fields_sql) . ");";
+        $pdo->query($create_sql);
     }
+    header("Location: ?db=$dbfile&page=tabelle"); exit;
 }
 
 // Edit table structure
 if ($pdo && $page === 'structure' && isset($_GET['table']) && is_logged_in()) {
     $table = $_GET['table'];
     $error_structure = "";
-    
     if (isset($_POST['save_structure'])) {
         $old_cols = $pdo->query("PRAGMA table_info('$table')")->fetchAll(PDO::FETCH_ASSOC);
         $old_col_names = array_column($old_cols, 'name');
         $new_cols = [];
-        
-        if (isset($_POST['col_oldname']) && is_array($_POST['col_oldname'])) {
-            for ($i=0; $i<count($_POST['col_oldname']); $i++) {
-                // Skip deleted columns
-                if (isset($_POST['delcol']) && in_array($i, $_POST['delcol'])) {
-                    continue;
-                }
-                
-                $colname = trim($_POST['col_newname'][$i] ?? '');
-                if ($colname === '') continue;
-                $colname = preg_replace("/[^a-zA-Z0-9_]/", "", $colname);
-                $coltype = $_POST['col_type'][$i] ?? 'TEXT';
-                $sql = "`$colname` $coltype";
-                
-                // Usa isset() per tutti i checkbox
-                if (isset($_POST['pk'][$i]) && $_POST['pk'][$i] == '1') $sql .= " PRIMARY KEY";
-                if (isset($_POST['ai'][$i]) && $_POST['ai'][$i] == '1' && $coltype == 'INTEGER' && isset($_POST['pk'][$i]) && $_POST['pk'][$i] == '1') $sql .= " AUTOINCREMENT";
-                if (isset($_POST['nn'][$i]) && $_POST['nn'][$i] == '1') $sql .= " NOT NULL";
-                if (isset($_POST['unique'][$i]) && $_POST['unique'][$i] == '1') $sql .= " UNIQUE";
-                if (isset($_POST['default'][$i]) && $_POST['default'][$i] !== '') $sql .= " DEFAULT '".addslashes($_POST['default'][$i])."'";
-                
-                $new_cols[] = [
-                    'sql' => $sql,
-                    'name' => $colname,
-                    'oldname' => $_POST['col_oldname'][$i]
-                ];
-            }
+        for ($i=0; $i<count($_POST['col_oldname']); $i++) {
+    // ADD THIS LINE:
+    if (isset($_POST['delcol']) && in_array($i, $_POST['delcol'])) {
+        continue; // Skip this column if it is marked for deletion
+    }
+            $colname = trim($_POST['col_newname'][$i]);
+            if ($colname === '') continue;
+            $colname = preg_replace("/[^a-zA-Z0-9_]/", "", $colname);
+            $coltype = $_POST['col_type'][$i];
+            $sql = "`$colname` $coltype";
+            if (!empty($_POST['pk'][$i])) $sql .= " PRIMARY KEY";
+            if (!empty($_POST['ai'][$i]) && $coltype == 'INTEGER' && !empty($_POST['pk'][$i])) $sql .= " AUTOINCREMENT";
+            if (!empty($_POST['nn'][$i])) $sql .= " NOT NULL";
+            if (!empty($_POST['unique'][$i])) $sql .= " UNIQUE";
+            if (isset($_POST['default'][$i]) && $_POST['default'][$i] !== '') $sql .= " DEFAULT '".addslashes($_POST['default'][$i])."'";
+            $new_cols[] = [
+                'sql' => $sql,
+                'name' => $colname,
+                'oldname' => $_POST['col_oldname'][$i]
+            ];
         }
-        
         if (count($new_cols) < 1) {
             $error_structure = "At least one column is needed to create the table.";
         } else {
@@ -434,29 +522,21 @@ if ($pdo && $page === 'structure' && isset($_GET['table']) && is_logged_in()) {
                 $pdo->beginTransaction();
                 $tmp_table = $table."_old_".time();
                 $pdo->exec("ALTER TABLE `$table` RENAME TO `$tmp_table`;");
-                
                 $cols_sql = array_column($new_cols, 'sql');
                 $create_sql = "CREATE TABLE `$table` (" . implode(", ", $cols_sql) . ");";
                 $pdo->exec($create_sql);
-                
                 $copy_cols_names = [];
                 foreach ($new_cols as $nc) {
                     if (in_array($nc['oldname'], $old_col_names)) {
                         $copy_cols_names[] = "`" . $nc['oldname'] . "`";
                     }
                 }
-                
                 if (count($copy_cols_names) > 0) {
                     $cols_list = implode(", ", $copy_cols_names);
                     $pdo->exec("INSERT INTO `$table` ($cols_list) SELECT $cols_list FROM `$tmp_table`;");
                 }
-                
                 $pdo->exec("DROP TABLE `$tmp_table`;");
                 $pdo->commit();
-                
-                header("Location: ?db=".urlencode($dbfile)."&page=structure&table=".urlencode($table));
-                exit;
-                
             } catch (Exception $e) {
                 $pdo->rollBack();
                 $error_structure = "Error while editing structure: " . $e->getMessage();
@@ -1508,6 +1588,14 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                                     <span class="nav-link-text">Database Info</span>
                                 </a>
                             </li>
+
+                            <li class="nav-item">
+                                <a href="?db=<?= urlencode($dbfile) ?>&page=print_structure" 
+                                   class="nav-link <?= ($page == 'print_structure') ? 'active' : '' ?>">
+                                    <i class="fas fa-print"></i>
+                                    <span class="nav-link-text">Print Structure</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
 
@@ -1708,6 +1796,12 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                     case 'truncate':
                         include_page_truncate();
                         break;
+                    case 'print_structure':
+                        include_page_print_structure();
+                        break;
+                    case 'print_output':
+                        include_page_print_output();
+                        break;
                 endswitch;
                 ?>
             </main>
@@ -1828,6 +1922,51 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
         document.getElementById('conditionsContainer')?.addEventListener('click', function(e) {
             if (e.target.classList.contains('btn-remove-condition')) {
                 e.target.closest('.condition-row').remove();
+            }
+        });
+
+        // SQL Editor improvements
+        document.addEventListener('DOMContentLoaded', function() {
+            const sqlEditor = document.getElementById('sql-editor');
+            
+            if (sqlEditor) {
+                // Auto-indentazione base
+                sqlEditor.addEventListener('keydown', function(e) {
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const start = this.selectionStart;
+                        const end = this.selectionEnd;
+                        
+                        // Inserisci 4 spazi
+                        this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+                        this.selectionStart = this.selectionEnd = start + 4;
+                    }
+                    
+                    // Ctrl+Enter per eseguire
+                    if (e.ctrlKey && e.key === 'Enter') {
+                        this.form.querySelector('button[type="submit"]').click();
+                    }
+                });
+                
+                // Sintassi SQL di base nel placeholder
+                const examples = [
+                    "SELECT * FROM table_name WHERE condition;",
+                    "INSERT INTO table_name (col1, col2) VALUES (val1, val2);",
+                    "UPDATE table_name SET col1 = val1 WHERE condition;",
+                    "DELETE FROM table_name WHERE condition;",
+                    "CREATE TABLE new_table (id INTEGER PRIMARY KEY, name TEXT);",
+                    "ALTER TABLE table_name ADD COLUMN new_column TEXT;",
+                    "CREATE INDEX idx_name ON table_name(column_name);",
+                    "PRAGMA table_info(table_name);"
+                ];
+                
+                let exampleIndex = 0;
+                sqlEditor.addEventListener('focus', function() {
+                    if (this.value === '' || this.value === this.placeholder) {
+                        this.value = examples[exampleIndex];
+                        exampleIndex = (exampleIndex + 1) % examples.length;
+                    }
+                });
             }
         });
     </script>
@@ -2114,11 +2253,11 @@ function include_page_crea_tabella() {
                                 <th>Default</th>
                             </tr>
                         </thead>
-                        <tbody id="cols-body-crea">
-                            <?php for($i=0; $i<3; $i++): ?>
+                        <tbody>
+                            <?php for($i=0; $i<5; $i++): ?>
                             <tr>
                                 <td>
-                                    <input type="text" name="col[]" class="form-input" placeholder="Column name" required>
+                                    <input type="text" name="col[]" class="form-input" placeholder="Nome colonna">
                                 </td>
                                 <td>
                                     <select name="type[]" class="form-input">
@@ -2126,30 +2265,25 @@ function include_page_crea_tabella() {
                                     </select>
                                 </td>
                                 <td class="text-center">
-                                    <input type="checkbox" name="pk[]" value="1">
+                                    <input type="checkbox" name="pk[<?=$i?>]" value="1">
                                 </td>
                                 <td class="text-center">
-                                    <input type="checkbox" name="ai[]" value="1">
+                                    <input type="checkbox" name="ai[<?=$i?>]" value="1">
                                 </td>
                                 <td class="text-center">
-                                    <input type="checkbox" name="nn[]" value="1">
+                                    <input type="checkbox" name="nn[<?=$i?>]" value="1">
                                 </td>
                                 <td class="text-center">
-                                    <input type="checkbox" name="unique[]" value="1">
+                                    <input type="checkbox" name="unique[<?=$i?>]" value="1">
                                 </td>
                                 <td>
-                                    <input type="text" name="default[]" class="form-input" placeholder="Default value">
+                                    <input type="text" name="default[]" class="form-input" placeholder="Valore default">
                                 </td>
                             </tr>
                             <?php endfor; ?>
                         </tbody>
                     </table>
                 </div>
-
-                <button type="button" class="btn btn-outline mb-2" onclick="addColumnRowCrea()">
-                    <i class="fas fa-plus"></i>
-                    Add Column
-                </button>
 
                 <button type="submit" class="btn btn-success">
                     <i class="fas fa-plus"></i>
@@ -2158,31 +2292,6 @@ function include_page_crea_tabella() {
             </form>
         </div>
     </div>
-
-    <script>
-    function addColumnRowCrea() {
-        const tbody = document.getElementById('cols-body-crea');
-        const i = tbody.rows.length;
-        const types = ['INTEGER','TEXT','REAL','BLOB','NUMERIC','BOOLEAN','DATETIME'];
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>
-                <input type="text" name="col[]" class="form-input" placeholder="Column name" required>
-            </td>
-            <td>
-                <select name="type[]" class="form-input">
-                    ${types.map(t => `<option value="${t}">${t}</option>`).join('')}
-                </select>
-            </td>
-            <td class="text-center"><input type="checkbox" name="pk[]" value="1"></td>
-            <td class="text-center"><input type="checkbox" name="ai[]" value="1"></td>
-            <td class="text-center"><input type="checkbox" name="nn[]" value="1"></td>
-            <td class="text-center"><input type="checkbox" name="unique[]" value="1"></td>
-            <td><input type="text" name="default[]" class="form-input" placeholder="Default value"></td>
-        `;
-        tbody.appendChild(tr);
-    }
-    </script>
     <?php
 }
 
@@ -2725,12 +2834,33 @@ function include_page_sql() {
                     <textarea name="sql" 
                               class="form-input" 
                               rows="8" 
-                              placeholder="INSERT INTO tabella (colonna1, colonna2) VALUES ('valore1', 'valore2');
-SELECT * FROM tabella WHERE condizione;
-CREATE TABLE nuova_tabella (id INTEGER PRIMARY KEY, nome TEXT);"
-                              style="font-family: 'Courier New', monospace; resize: vertical;"><?= $built_query ? htmlspecialchars($built_query) : (isset($_POST['sql']) ? htmlspecialchars($_POST['sql']) : '') ?></textarea>
+                              placeholder="-- Supported SQLite commands:
+-- DML: SELECT, INSERT, UPDATE, DELETE
+-- DDL: CREATE, ALTER, DROP, RENAME
+-- Transactions: BEGIN, COMMIT, ROLLBACK
+-- Indexes: CREATE INDEX, DROP INDEX
+-- Views: CREATE VIEW, DROP VIEW
+-- Triggers: CREATE TRIGGER, DROP TRIGGER
+-- PRAGMA statements: PRAGMA table_info(table), PRAGMA index_list(table), etc.
+-- ATTACH DATABASE, DETACH DATABASE
+-- VACUUM, ANALYZE
+
+-- Examples:
+-- CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);
+-- CREATE INDEX idx_name ON users(name);
+-- CREATE VIEW active_users AS SELECT * FROM users WHERE active=1;
+-- PRAGMA table_info(users);
+-- BEGIN TRANSACTION; ... COMMIT;"
+                              style="font-family: 'Courier New', monospace; resize: vertical;"
+                              id="sql-editor"><?= $built_query ? htmlspecialchars($built_query) : (isset($_POST['sql']) ? htmlspecialchars($_POST['sql']) : '') ?></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary">
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <i class="fas fa-lightbulb"></i>
+                        Tips: Use Ctrl+Enter to execute query | F1 for SQLite documentation
+                    </small>
+                </div>
+                <button type="submit" class="btn btn-primary mt-2">
                     <i class="fas fa-play"></i>
                     Run Query
                 </button>
@@ -3374,52 +3504,63 @@ function include_page_truncate() {
     <?php
 }
 
+function include_page_print_structure() {
+    global $dbfile, $pdo;
+    ?>
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-print"></i>
+            Print Database Structure
+        </h1>
+        <p class="page-subtitle">
+            Generate printable structure report for <?= htmlspecialchars($dbfile) ?>
+        </p>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Database Structure Report</h3>
+        </div>
+        <div class="card-body">
+            <?php
+            $structure = get_database_structure($pdo);
+            if ($structure && !empty($structure['tables'])) {
+                echo '<div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    Click the button below to generate a printable report of the database structure.
+                </div>';
+                
+                echo '<a href="?db=' . urlencode($dbfile) . '&page=print_output" 
+                      target="_blank" class="btn btn-primary">
+                    <i class="fas fa-print"></i>
+                    Generate Printable Report
+                </a>';
+            } else {
+                echo '<div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    No tables found or unable to read database structure.
+                </div>';
+            }
+            ?>
+        </div>
+    </div>
+    <?php
+}
+
+function include_page_print_output() {
+    global $dbfile, $pdo;
+    
+    $structure = get_database_structure($pdo);
+    if ($structure) {
+        echo generate_print_structure($structure, $dbfile);
+    } else {
+        echo "Unable to generate structure report.";
+    }
+}
+
 ?>
 <script>
 document.querySelectorAll('.alert').forEach(function(alert) {
   if(alert.textContent.trim() === '') { alert.style.display = 'none'; }
 });
-
-// Fix per i form dinamici
-document.addEventListener('DOMContentLoaded', function() {
-    // Gestione rimozione condizioni query builder
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('btn-remove-condition')) {
-            e.target.closest('.condition-row').remove();
-        }
-    });
-    
-    // Fix per i checkbox nei form dinamici
-    document.addEventListener('change', function(e) {
-        if (e.target.type === 'checkbox') {
-            // Assicurati che i checkbox siano gestiti correttamente
-            e.target.value = e.target.checked ? '1' : '0';
-        }
-    });
-});
-
-// Funzione per aggiungere righe nella query builder
-function addCondition() {
-    const container = document.getElementById('conditionsContainer');
-    const index = container.children.length;
-    const div = document.createElement('div');
-    div.className = 'condition-row';
-    div.innerHTML = `
-        <select name="where[${index}][column]" class="form-input">
-            <option value="">Select field</option>
-        </select>
-        <select name="where[${index}][operator]" class="form-input">
-            <option value="=">equal</option>
-            <option value="!=">Different</option>
-            <option value="<">Minor</option>
-            <option value="<=">Less than or equal</option>
-            <option value=">">Greater</option>
-            <option value=">=">Greater than or equal</option>
-            <option value="LIKE">Contains</option>
-        </select>
-        <input type="text" name="where[${index}][value]" class="form-input" placeholder="Value">
-        <button type="button" class="btn btn-danger btn-sm btn-remove-condition">&times;</button>
-    `;
-    container.appendChild(div);
-}
 </script>
