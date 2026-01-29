@@ -79,6 +79,7 @@ function get_database_info($dbfile) {
 }
 
 function formatBytes($size, $precision = 2) {
+    if ($size <= 0) return '0 B';
     $units = ['B', 'KB', 'MB', 'GB', 'TB'];
     $base = log($size, 1024);
     return round(pow(1024, $base - floor($base)), $precision) . ' ' . $units[floor($base)];
@@ -229,6 +230,11 @@ $import_success = '';
 $query_result = '';
 $browse_error = '';
 $error_structure = '';
+$browse_data = [];
+$page_num = 1;
+$per_page = 100;
+$total_records = 0;
+$total_pages = 1;
 
 // Login/Logout
 if (isset($_POST['login'])) {
@@ -312,25 +318,79 @@ if (isset($_GET['vacuum']) && $pdo && is_logged_in()) {
 // Export SQL or CSV data
 if (isset($_GET['export_format']) && $pdo && $dbfile && is_logged_in()) {
     $fmt = $_GET['export_format'];
-    // If SQL, complete dump schema + data
+    // If SQL, complete dump schema + data + indexes + views + triggers
     if ($fmt === 'sql') {
         header('Content-Type: application/sql');
         header('Content-Disposition: attachment; filename="'.basename($dbfile, '.db').'.sql"');
-        $out = '';
-        // Export schema
-        $tables = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")->fetchAll(PDO::FETCH_ASSOC);
+        
+        $out = "-- PHPLiteAdmin SQL Export\n";
+        $out .= "-- Database: " . $dbfile . "\n";
+        $out .= "-- Date: " . date('Y-m-d H:i:s') . "\n";
+        $out .= "-- SQLite version: " . SQLite3::version()['versionString'] . "\n\n";
+        $out .= "PRAGMA foreign_keys=OFF;\nBEGIN TRANSACTION;\n\n";
+        
+        // Export tables
+        $out .= "-- ========== TABLES ==========\n";
+        $tables = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
         foreach ($tables as $t) {
-            $out .= $t['sql'] . ";\n";
-        }
-        // Export data
-        foreach ($tables as $t) {
-            $rows = $pdo->query("SELECT * FROM `{$t['name']}`")->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($rows as $r) {
-                $cols = array_keys($r);
-                $vals = array_map([$pdo, 'quote'], array_values($r));
-                $out .= "INSERT INTO `{$t['name']}` (`".implode('`,`',$cols)."`) VALUES(".implode(',',$vals).");\n";
+            if ($t['sql']) {
+                $out .= "-- Table: " . $t['name'] . "\n";
+                $out .= $t['sql'] . ";\n\n";
             }
         }
+        
+        // Export indexes
+        $indexes = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+        if (!empty($indexes)) {
+            $out .= "-- ========== INDEXES ==========\n";
+            foreach ($indexes as $idx) {
+                $out .= $idx['sql'] . ";\n";
+            }
+            $out .= "\n";
+        }
+        
+        // Export views
+        $views = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+        if (!empty($views)) {
+            $out .= "-- ========== VIEWS ==========\n";
+            foreach ($views as $v) {
+                if ($v['sql']) {
+                    $out .= "-- View: " . $v['name'] . "\n";
+                    $out .= $v['sql'] . ";\n\n";
+                }
+            }
+        }
+        
+        // Export triggers
+        $triggers = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='trigger' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+        if (!empty($triggers)) {
+            $out .= "-- ========== TRIGGERS ==========\n";
+            foreach ($triggers as $tr) {
+                if ($tr['sql']) {
+                    $out .= "-- Trigger: " . $tr['name'] . "\n";
+                    $out .= $tr['sql'] . ";\n\n";
+                }
+            }
+        }
+        
+        // Export data
+        $out .= "-- ========== DATA ==========\n";
+        foreach ($tables as $t) {
+            $rows = $pdo->query("SELECT * FROM `{$t['name']}`")->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($rows)) {
+                $out .= "-- Data for table: " . $t['name'] . "\n";
+                foreach ($rows as $r) {
+                    $cols = array_keys($r);
+                    $vals = array_map(function($v) use ($pdo) {
+                        return $v === null ? 'NULL' : $pdo->quote($v);
+                    }, array_values($r));
+                    $out .= "INSERT INTO `{$t['name']}` (`".implode('`,`',$cols)."`) VALUES(".implode(',',$vals).");\n";
+                }
+                $out .= "\n";
+            }
+        }
+        
+        $out .= "COMMIT;\n";
         echo $out;
         exit;
     }
@@ -341,8 +401,9 @@ if (isset($_GET['export_format']) && $pdo && $dbfile && is_logged_in()) {
             echo "Errore: nessuna tabella selezionata.";
             exit;
         }
-        header('Content-Type: text/csv');
+        header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="'.basename($table).'.csv"');
+        echo "\xEF\xBB\xBF"; // BOM for Excel UTF-8
         $out = fopen('php://output', 'w');
         $rows = $pdo->query("SELECT * FROM `$table`")->fetchAll(PDO::FETCH_ASSOC);
         if ($rows) {
@@ -495,10 +556,10 @@ if ($pdo && $page === 'structure' && isset($_GET['table']) && is_logged_in()) {
         $old_col_names = array_column($old_cols, 'name');
         $new_cols = [];
         for ($i=0; $i<count($_POST['col_oldname']); $i++) {
-    // ADD THIS LINE:
-    if (isset($_POST['delcol']) && in_array($i, $_POST['delcol'])) {
-        continue; // Skip this column if it is marked for deletion
-    }
+            // Skip columns marked for deletion
+            if (isset($_POST['delcol']) && in_array($i, $_POST['delcol'])) {
+                continue;
+            }
             $colname = trim($_POST['col_newname'][$i]);
             if ($colname === '') continue;
             $colname = preg_replace("/[^a-zA-Z0-9_]/", "", $colname);
@@ -666,8 +727,13 @@ if ($pdo && $page === 'browse' && isset($_GET['table']) && is_logged_in()) {
         }
     }
     
-    // Retrieve data for viewing
-    $browse_data = $pdo->query("SELECT rowid, * FROM `$browse_table` LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+    // Retrieve data for viewing with pagination
+    $page_num = max(1, intval($_GET['p'] ?? 1));
+    $per_page = max(10, min(500, intval($_GET['pp'] ?? 100)));
+    $offset = ($page_num - 1) * $per_page;
+    $total_records = $pdo->query("SELECT COUNT(*) FROM `$browse_table`")->fetchColumn();
+    $total_pages = max(1, ceil($total_records / $per_page));
+    $browse_data = $pdo->query("SELECT rowid, * FROM `$browse_table` LIMIT $per_page OFFSET $offset")->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Table deletion
@@ -1582,6 +1648,22 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                             </li>
 
                             <li class="nav-item">
+                                <a href="?db=<?= urlencode($dbfile) ?>&page=views" 
+                                   class="nav-link <?= ($page == 'views') ? 'active' : '' ?>">
+                                    <i class="fas fa-eye"></i>
+                                    <span class="nav-link-text">Views</span>
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
+                                <a href="?db=<?= urlencode($dbfile) ?>&page=triggers" 
+                                   class="nav-link <?= ($page == 'triggers') ? 'active' : '' ?>">
+                                    <i class="fas fa-bolt"></i>
+                                    <span class="nav-link-text">Triggers</span>
+                                </a>
+                            </li>
+
+                            <li class="nav-item">
                                 <a href="?db=<?= urlencode($dbfile) ?>&page=info" 
                                    class="nav-link <?= ($page == 'info') ? 'active' : '' ?>">
                                     <i class="fas fa-info-circle"></i>
@@ -1792,6 +1874,15 @@ if (isset($_GET['page']) && $_GET['page']==='truncate' && isset($_GET['table']) 
                         break;
                     case 'structure':
                         include_page_structure();
+                        break;
+                    case 'indexes':
+                        include_page_indexes();
+                        break;
+                    case 'views':
+                        include_page_views();
+                        break;
+                    case 'triggers':
+                        include_page_triggers();
                         break;
                     case 'truncate':
                         include_page_truncate();
@@ -2184,6 +2275,11 @@ function include_page_tabelle() {
                                                class="btn btn-warning btn-sm">
                                                 <i class="fas fa-cogs"></i>
                                                 Structure
+                                            </a>
+                                            <a href="?db=<?= urlencode($dbfile) ?>&page=indexes&table=<?= urlencode($table['name']) ?>" 
+                                               class="btn btn-primary btn-sm">
+                                                <i class="fas fa-list-ol"></i>
+                                                Indexes
                                             </a>
                                             <a href="?db=<?=urlencode($dbfile)?>&amp;page=truncate&amp;table=<?=urlencode($table['name'])?>" 
                                                class="btn btn-danger btn-sm">
@@ -3181,7 +3277,7 @@ function include_page_info() {
 }
 
 function include_page_browse() {
-    global $dbfile, $pdo, $browse_error, $browse_data;
+    global $dbfile, $pdo, $browse_error, $browse_data, $page_num, $per_page, $total_records, $total_pages;
 
     $table = $_GET['table'] ?? '';
     if (!$table || !$pdo) {
@@ -3324,11 +3420,56 @@ function include_page_browse() {
                         Save changes
                     </button>
                 </form>
+                
+                <!-- Pagination Controls -->
+                <div class="mt-3" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        Showing <?= (($page_num - 1) * $per_page + 1) ?> - <?= min($page_num * $per_page, $total_records) ?> of <?= number_format($total_records) ?> records
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <form method="get" style="display: flex; align-items: center; gap: 0.5rem;">
+                            <input type="hidden" name="db" value="<?= htmlspecialchars($dbfile) ?>">
+                            <input type="hidden" name="page" value="browse">
+                            <input type="hidden" name="table" value="<?= htmlspecialchars($table) ?>">
+                            <label>Per page:</label>
+                            <select name="pp" class="form-input" style="width: auto; padding: 0.5rem;" onchange="this.form.submit()">
+                                <?php foreach ([25, 50, 100, 200, 500] as $pp): ?>
+                                    <option value="<?= $pp ?>" <?= ($per_page == $pp) ? 'selected' : '' ?>><?= $pp ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+                
+                <?php if ($total_pages > 1): ?>
+                <div style="display: flex; justify-content: center; align-items: center; gap: 0.25rem; margin-top: 1rem; flex-wrap: wrap;">
+                    <?php 
+                    $base_url = "?db=" . urlencode($dbfile) . "&page=browse&table=" . urlencode($table) . "&pp=" . $per_page;
+                    ?>
+                    <?php if ($page_num > 1): ?>
+                        <a href="<?= $base_url ?>&p=1" class="btn btn-sm btn-outline" title="First"><i class="fas fa-angle-double-left"></i></a>
+                        <a href="<?= $base_url ?>&p=<?= $page_num - 1 ?>" class="btn btn-sm btn-outline" title="Previous"><i class="fas fa-angle-left"></i></a>
+                    <?php endif; ?>
+                    
+                    <?php
+                    $start_page = max(1, $page_num - 2);
+                    $end_page = min($total_pages, $page_num + 2);
+                    for ($i = $start_page; $i <= $end_page; $i++):
+                    ?>
+                        <?php if ($i == $page_num): ?>
+                            <span class="btn btn-sm btn-primary"><?= $i ?></span>
+                        <?php else: ?>
+                            <a href="<?= $base_url ?>&p=<?= $i ?>" class="btn btn-sm btn-outline"><?= $i ?></a>
+                        <?php endif; ?>
+                    <?php endfor; ?>
+                    
+                    <?php if ($page_num < $total_pages): ?>
+                        <a href="<?= $base_url ?>&p=<?= $page_num + 1 ?>" class="btn btn-sm btn-outline" title="Next"><i class="fas fa-angle-right"></i></a>
+                        <a href="<?= $base_url ?>&p=<?= $total_pages ?>" class="btn btn-sm btn-outline" title="Last"><i class="fas fa-angle-double-right"></i></a>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
             </div>
-        </div>
-        <div class="text-muted mt-2">
-            <i class="fas fa-info-circle"></i>
-            The first 100 records are displayed. To display more records, use a custom SQL query.
         </div>
     <?php endif; ?>
     <?php
@@ -3556,6 +3697,326 @@ function include_page_print_output() {
     } else {
         echo "Unable to generate structure report.";
     }
+}
+
+// ============ INDEXES PAGE ============
+function include_page_indexes() {
+    global $dbfile, $pdo;
+    
+    $table = $_GET['table'] ?? '';
+    if (!$table || !$pdo) {
+        echo '<div class="alert alert-error">Table not specified or database not available.</div>';
+        return;
+    }
+    
+    $success_msg = '';
+    $error_msg = '';
+    
+    // Create index
+    if (isset($_POST['create_index'])) {
+        $idx_name = preg_replace('/[^a-zA-Z0-9_]/', '', $_POST['index_name'] ?? '');
+        $idx_cols = $_POST['index_cols'] ?? [];
+        $idx_unique = isset($_POST['index_unique']) ? 'UNIQUE' : '';
+        
+        if ($idx_name && !empty($idx_cols)) {
+            $cols_list = implode(', ', array_map(function($c) {
+                return '`' . preg_replace('/[^a-zA-Z0-9_]/', '', $c) . '`';
+            }, $idx_cols));
+            try {
+                $pdo->exec("CREATE $idx_unique INDEX `$idx_name` ON `$table` ($cols_list)");
+                $success_msg = "Index created successfully";
+            } catch (Exception $e) {
+                $error_msg = "Error creating index: " . $e->getMessage();
+            }
+        }
+    }
+    
+    // Drop index
+    if (isset($_GET['drop_index'])) {
+        $idx_name = preg_replace('/[^a-zA-Z0-9_]/', '', $_GET['drop_index']);
+        try {
+            $pdo->exec("DROP INDEX IF EXISTS `$idx_name`");
+            $success_msg = "Index deleted successfully";
+        } catch (Exception $e) {
+            $error_msg = "Error deleting index: " . $e->getMessage();
+        }
+    }
+    
+    // Get existing indexes
+    $indexes = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='$table' AND sql IS NOT NULL")->fetchAll(PDO::FETCH_ASSOC);
+    $columns = $pdo->query("PRAGMA table_info(`$table`)")->fetchAll(PDO::FETCH_ASSOC);
+    ?>
+    
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-list-ol"></i> Indexes: <?= htmlspecialchars($table) ?></h1>
+        <p class="page-subtitle">Manage table indexes</p>
+    </div>
+    
+    <?php if ($success_msg): ?>
+        <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($success_msg) ?></div>
+    <?php endif; ?>
+    <?php if ($error_msg): ?>
+        <div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i> <?= htmlspecialchars($error_msg) ?></div>
+    <?php endif; ?>
+    
+    <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-plus"></i> Create New Index</h3></div>
+        <div class="card-body">
+            <form method="post">
+                <div class="form-group mb-2">
+                    <label class="form-label">Index Name</label>
+                    <input type="text" name="index_name" class="form-input" required placeholder="idx_name">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label">Columns (hold Ctrl to select multiple)</label>
+                    <select name="index_cols[]" class="form-input" multiple size="5" required>
+                        <?php foreach ($columns as $col): ?>
+                            <option value="<?= htmlspecialchars($col['name']) ?>"><?= htmlspecialchars($col['name']) ?> (<?= htmlspecialchars($col['type']) ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" name="index_unique" id="idx_unique" value="1">
+                    <label for="idx_unique">UNIQUE Index</label>
+                </div>
+                <button type="submit" name="create_index" class="btn btn-success"><i class="fas fa-plus"></i> Create Index</button>
+                <a href="?db=<?= urlencode($dbfile) ?>&page=structure&table=<?= urlencode($table) ?>" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Structure</a>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header"><h3 class="card-title">Existing Indexes (<?= count($indexes) ?>)</h3></div>
+        <div class="card-body">
+            <?php if (empty($indexes)): ?>
+                <p class="text-muted text-center">No indexes defined for this table.</p>
+            <?php else: ?>
+                <div class="table-container">
+                    <table class="table">
+                        <thead><tr><th>Name</th><th>SQL Definition</th><th>Actions</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($indexes as $idx): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($idx['name']) ?></strong></td>
+                                <td><code style="font-size: 0.85em;"><?= htmlspecialchars($idx['sql']) ?></code></td>
+                                <td>
+                                    <a href="?db=<?= urlencode($dbfile) ?>&page=indexes&table=<?= urlencode($table) ?>&drop_index=<?= urlencode($idx['name']) ?>" 
+                                       class="btn btn-danger btn-sm" onclick="return confirm('Delete this index?')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
+}
+
+// ============ VIEWS PAGE ============
+function include_page_views() {
+    global $dbfile, $pdo;
+    
+    $success_msg = '';
+    $error_msg = '';
+    
+    // Create view
+    if (isset($_POST['create_view'])) {
+        $view_name = preg_replace('/[^a-zA-Z0-9_]/', '', $_POST['view_name'] ?? '');
+        $view_sql = trim($_POST['view_sql'] ?? '');
+        
+        if ($view_name && $view_sql) {
+            try {
+                $pdo->exec("CREATE VIEW `$view_name` AS $view_sql");
+                $success_msg = "View created successfully";
+            } catch (Exception $e) {
+                $error_msg = "Error creating view: " . $e->getMessage();
+            }
+        }
+    }
+    
+    // Drop view
+    if (isset($_GET['drop_view'])) {
+        $view_name = preg_replace('/[^a-zA-Z0-9_]/', '', $_GET['drop_view']);
+        try {
+            $pdo->exec("DROP VIEW IF EXISTS `$view_name`");
+            $success_msg = "View deleted successfully";
+        } catch (Exception $e) {
+            $error_msg = "Error deleting view: " . $e->getMessage();
+        }
+    }
+    
+    $views = $pdo->query("SELECT name, sql FROM sqlite_master WHERE type='view' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    ?>
+    
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-eye"></i> Views</h1>
+        <p class="page-subtitle">Manage database views for <?= htmlspecialchars($dbfile) ?></p>
+    </div>
+    
+    <?php if ($success_msg): ?>
+        <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($success_msg) ?></div>
+    <?php endif; ?>
+    <?php if ($error_msg): ?>
+        <div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i> <?= htmlspecialchars($error_msg) ?></div>
+    <?php endif; ?>
+    
+    <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-plus"></i> Create New View</h3></div>
+        <div class="card-body">
+            <form method="post">
+                <div class="form-group mb-2">
+                    <label class="form-label">View Name</label>
+                    <input type="text" name="view_name" class="form-input" required placeholder="v_viewname">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label">SELECT Query</label>
+                    <textarea name="view_sql" class="form-input" rows="5" required placeholder="SELECT col1, col2 FROM table WHERE ..."
+                              style="font-family: 'Courier New', monospace;"></textarea>
+                </div>
+                <button type="submit" name="create_view" class="btn btn-success"><i class="fas fa-plus"></i> Create View</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header"><h3 class="card-title">Existing Views (<?= count($views) ?>)</h3></div>
+        <div class="card-body">
+            <?php if (empty($views)): ?>
+                <p class="text-muted text-center">No views defined in this database.</p>
+            <?php else: ?>
+                <div class="table-container">
+                    <table class="table">
+                        <thead><tr><th>Name</th><th>SQL Definition</th><th>Actions</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($views as $v): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($v['name']) ?></strong></td>
+                                <td><code style="font-size: 0.8em; white-space: pre-wrap;"><?= htmlspecialchars($v['sql']) ?></code></td>
+                                <td>
+                                    <a href="?db=<?= urlencode($dbfile) ?>&page=browse&table=<?= urlencode($v['name']) ?>" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-eye"></i> Browse
+                                    </a>
+                                    <a href="?db=<?= urlencode($dbfile) ?>&page=views&drop_view=<?= urlencode($v['name']) ?>" 
+                                       class="btn btn-danger btn-sm" onclick="return confirm('Delete this view?')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
+}
+
+// ============ TRIGGERS PAGE ============
+function include_page_triggers() {
+    global $dbfile, $pdo;
+    
+    $success_msg = '';
+    $error_msg = '';
+    
+    // Create trigger
+    if (isset($_POST['create_trigger'])) {
+        $trigger_sql = trim($_POST['trigger_sql'] ?? '');
+        
+        if ($trigger_sql) {
+            try {
+                $pdo->exec($trigger_sql);
+                $success_msg = "Trigger created successfully";
+            } catch (Exception $e) {
+                $error_msg = "Error creating trigger: " . $e->getMessage();
+            }
+        }
+    }
+    
+    // Drop trigger
+    if (isset($_GET['drop_trigger'])) {
+        $trigger_name = preg_replace('/[^a-zA-Z0-9_]/', '', $_GET['drop_trigger']);
+        try {
+            $pdo->exec("DROP TRIGGER IF EXISTS `$trigger_name`");
+            $success_msg = "Trigger deleted successfully";
+        } catch (Exception $e) {
+            $error_msg = "Error deleting trigger: " . $e->getMessage();
+        }
+    }
+    
+    $triggers = $pdo->query("SELECT name, sql, tbl_name FROM sqlite_master WHERE type='trigger' ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    ?>
+    
+    <div class="page-header">
+        <h1 class="page-title"><i class="fas fa-bolt"></i> Triggers</h1>
+        <p class="page-subtitle">Manage database triggers for <?= htmlspecialchars($dbfile) ?></p>
+    </div>
+    
+    <?php if ($success_msg): ?>
+        <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($success_msg) ?></div>
+    <?php endif; ?>
+    <?php if ($error_msg): ?>
+        <div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i> <?= htmlspecialchars($error_msg) ?></div>
+    <?php endif; ?>
+    
+    <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-plus"></i> Create New Trigger</h3></div>
+        <div class="card-body">
+            <form method="post">
+                <div class="form-group mb-2">
+                    <label class="form-label">Complete SQL Statement</label>
+                    <textarea name="trigger_sql" class="form-input" rows="8" required 
+                              placeholder="CREATE TRIGGER trigger_name AFTER INSERT ON table_name
+BEGIN
+    -- Your SQL statements here
+    UPDATE other_table SET column = NEW.value WHERE id = NEW.id;
+END;"
+                              style="font-family: 'Courier New', monospace;"></textarea>
+                </div>
+                <div class="alert alert-info mb-3">
+                    <strong>Examples:</strong><br>
+                    <code>CREATE TRIGGER log_insert AFTER INSERT ON users BEGIN INSERT INTO audit_log (action, user_id) VALUES ('INSERT', NEW.id); END;</code><br>
+                    <code>CREATE TRIGGER update_timestamp BEFORE UPDATE ON orders BEGIN UPDATE orders SET updated_at = datetime('now') WHERE id = OLD.id; END;</code>
+                </div>
+                <button type="submit" name="create_trigger" class="btn btn-success"><i class="fas fa-plus"></i> Create Trigger</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header"><h3 class="card-title">Existing Triggers (<?= count($triggers) ?>)</h3></div>
+        <div class="card-body">
+            <?php if (empty($triggers)): ?>
+                <p class="text-muted text-center">No triggers defined in this database.</p>
+            <?php else: ?>
+                <div class="table-container">
+                    <table class="table">
+                        <thead><tr><th>Name</th><th>Table</th><th>SQL Definition</th><th>Actions</th></tr></thead>
+                        <tbody>
+                        <?php foreach ($triggers as $tr): ?>
+                            <tr>
+                                <td><strong><?= htmlspecialchars($tr['name']) ?></strong></td>
+                                <td><?= htmlspecialchars($tr['tbl_name']) ?></td>
+                                <td><code style="font-size: 0.75em; white-space: pre-wrap;"><?= htmlspecialchars($tr['sql']) ?></code></td>
+                                <td>
+                                    <a href="?db=<?= urlencode($dbfile) ?>&page=triggers&drop_trigger=<?= urlencode($tr['name']) ?>" 
+                                       class="btn btn-danger btn-sm" onclick="return confirm('Delete this trigger?')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
 }
 
 ?>
